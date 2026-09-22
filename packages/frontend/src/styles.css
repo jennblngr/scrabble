@@ -562,16 +562,22 @@ body {
 
 .tile--blank {
   background: var(--tile-blank-bg);
-  font-style: italic;
+  text-decoration: underline;
 }
 
 .tile__value {
   position: absolute;
-  bottom: 2px;
-  right: 4px;
+  bottom: 0px;
+  right: 3px;
   font-size: 0.55rem;
   font-weight: 600;
   opacity: 0.75;
+}
+
+.board .tile__value {
+  bottom: -1px;
+  right: 1px;
+  font-size: 0.45rem;
 }
 
 .game__actions {

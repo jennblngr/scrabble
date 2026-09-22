@@ -40,7 +40,7 @@ export function Tile({
       onPointerUp={onPointerUp}
       onPointerCancel={onPointerCancel}
     >
-      <span className="tile__letter">{letter || "★"}</span>
+      <span className="tile__letter">{letter}</span>
       {!isBlank && <span className="tile__value">{value}</span>}
     </button>
   );
