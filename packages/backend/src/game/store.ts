@@ -96,6 +96,11 @@ export async function loadGame(id: string): Promise<InternalGame> {
   return game;
 }
 
+export async function deleteGame(gameId: string): Promise<void> {
+  await pool.query(`DELETE FROM games WHERE id = $1`, [gameId]);
+  cache.delete(gameId);
+}
+
 export async function markReminded(gameId: string): Promise<void> {
   const { rows } = await pool.query(
     `UPDATE games SET last_reminded_at = now() WHERE id = $1 RETURNING last_reminded_at`,

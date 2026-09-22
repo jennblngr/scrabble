@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { GameSummary } from "@scrabble/shared";
-import { listGames, createGame, remindOpponent } from "../api/games";
+import { listGames, createGame, remindOpponent, deleteGame } from "../api/games";
 import { logout } from "../api/auth";
 import { ThemeToggle } from "../components/ThemeToggle";
 
@@ -35,6 +35,17 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
       setError((err as Error).message);
     } finally {
       setCreating(false);
+    }
+  }
+
+  async function handleDelete(gameId: string) {
+    if (!window.confirm("Supprimer cette partie ? Cette action est irréversible.")) return;
+    setError(null);
+    try {
+      await deleteGame(gameId);
+      setGames((prev) => prev?.filter((g) => g.id !== gameId) ?? prev);
+    } catch (err) {
+      setError((err as Error).message);
     }
   }
 
@@ -86,7 +97,7 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
                     <h3>Votre tour</h3>
                     <ul className="games-list__items">
                       {myTurn.map((g) => (
-                        <GameRow key={g.id} game={g} username={username} onOpen={() => onOpenGame(g.id)} />
+                        <GameRow key={g.id} game={g} username={username} onOpen={() => onOpenGame(g.id)} onDelete={() => handleDelete(g.id)} />
                       ))}
                     </ul>
                   </div>
@@ -96,7 +107,7 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
                     <h3>Son tour</h3>
                     <ul className="games-list__items">
                       {theirTurn.map((g) => (
-                        <GameRow key={g.id} game={g} username={username} onOpen={() => onOpenGame(g.id)} />
+                        <GameRow key={g.id} game={g} username={username} onOpen={() => onOpenGame(g.id)} onDelete={() => handleDelete(g.id)} />
                       ))}
                     </ul>
                   </div>
@@ -112,7 +123,7 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
             ) : (
               <ul className="games-list__items">
                 {finished.map((g) => (
-                  <GameRow key={g.id} game={g} username={username} onOpen={() => onOpenGame(g.id)} />
+                  <GameRow key={g.id} game={g} username={username} onOpen={() => onOpenGame(g.id)} onDelete={() => handleDelete(g.id)} />
                 ))}
               </ul>
             )}
@@ -123,7 +134,17 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
   );
 }
 
-function GameRow({ game, username, onOpen }: { game: GameSummary; username: string; onOpen: () => void }) {
+function GameRow({
+  game,
+  username,
+  onOpen,
+  onDelete,
+}: {
+  game: GameSummary;
+  username: string;
+  onOpen: () => void;
+  onDelete: () => void;
+}) {
   const [reminded, setReminded] = useState(false);
   const [reminding, setReminding] = useState(false);
 
@@ -162,6 +183,11 @@ function GameRow({ game, username, onOpen }: { game: GameSummary; username: stri
     }
   }
 
+  function handleDeleteClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    onDelete();
+  }
+
   return (
     <li className={`games-list__item${isMyTurn ? " games-list__item--active" : ""}`}>
       <button type="button" className="games-list__item-open" onClick={onOpen}>
@@ -185,6 +211,21 @@ function GameRow({ game, username, onOpen }: { game: GameSummary; username: stri
           </svg>
         </button>
       )}
+      <button
+        type="button"
+        className="games-list__delete"
+        onClick={handleDeleteClick}
+        aria-label="Supprimer la partie"
+        title="Supprimer la partie"
+      >
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+          <path d="M10 11v6"></path>
+          <path d="M14 11v6"></path>
+          <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+        </svg>
+      </button>
     </li>
   );
 }

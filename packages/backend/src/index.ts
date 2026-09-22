@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import { config } from "./config.js";
 import { registerAuth, getUsernameFromRequest } from "./auth/auth.js";
-import { createNewGame, listGames, loadGame, markReminded } from "./game/store.js";
+import { createNewGame, listGames, loadGame, markReminded, deleteGame } from "./game/store.js";
 import { saveSubscription, notifyUser } from "./push.js";
 import { setupSocket } from "./socket/index.js";
 
@@ -49,6 +49,17 @@ app.post<{ Params: { id: string } }>("/api/games/:id/remind", async (req, reply)
     body: `${username} attend que tu joues ton coup !`,
   });
   await markReminded(game.id);
+  return { ok: true };
+});
+
+app.delete<{ Params: { id: string } }>("/api/games/:id", async (req, reply) => {
+  const username = getUsernameFromRequest(req);
+  if (!username) return reply.code(401).send({ error: "Non authentifié" });
+
+  // Comme la liste des parties, la suppression n'est pas limitée aux joueurs
+  // de cette partie précise : ce sont les 2 seuls comptes de l'appli et ils
+  // partagent la même liste (y compris les vieilles parties de test).
+  await deleteGame(req.params.id);
   return { ok: true };
 });
 
