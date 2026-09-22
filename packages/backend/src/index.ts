@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import { config } from "./config.js";
 import { registerAuth, getUsernameFromRequest } from "./auth/auth.js";
-import { createNewGame, listGames, loadGame } from "./game/store.js";
+import { createNewGame, listGames, loadGame, markReminded } from "./game/store.js";
 import { saveSubscription, notifyUser } from "./push.js";
 import { setupSocket } from "./socket/index.js";
 
@@ -35,8 +35,12 @@ app.post<{ Params: { id: string } }>("/api/games/:id/remind", async (req, reply)
   if (game.status === "finished" || game.currentPlayerId === username) {
     return reply.code(400).send({ error: "Impossible de relancer maintenant" });
   }
-  const hoursSinceLastMove = (Date.now() - new Date(game.updatedAt).getTime()) / 3_600_000;
-  if (hoursSinceLastMove < 24) {
+  const lastActivity =
+    game.lastRemindedAt && new Date(game.lastRemindedAt) > new Date(game.updatedAt)
+      ? game.lastRemindedAt
+      : game.updatedAt;
+  const hoursSinceLastActivity = (Date.now() - new Date(lastActivity).getTime()) / 3_600_000;
+  if (hoursSinceLastActivity < 24) {
     return reply.code(400).send({ error: "Trop tôt pour relancer" });
   }
 
@@ -44,6 +48,7 @@ app.post<{ Params: { id: string } }>("/api/games/:id/remind", async (req, reply)
     title: "Scrabble",
     body: `${username} attend que tu joues ton coup !`,
   });
+  await markReminded(game.id);
   return { ok: true };
 });
 

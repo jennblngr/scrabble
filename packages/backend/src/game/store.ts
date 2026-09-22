@@ -14,7 +14,7 @@ export async function createNewGame(): Promise<InternalGame> {
 
 export async function listGames(): Promise<GameSummary[]> {
   const { rows } = await pool.query(
-    `SELECT g.id, g.status, g.current_player_username, g.created_at, g.updated_at,
+    `SELECT g.id, g.status, g.current_player_username, g.created_at, g.updated_at, g.last_reminded_at,
             p.username, p.score
      FROM games g
      JOIN game_players p ON p.game_id = g.id
@@ -32,6 +32,7 @@ export async function listGames(): Promise<GameSummary[]> {
         currentPlayerId: row.current_player_username,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        lastRemindedAt: row.last_reminded_at,
       };
       byId.set(row.id, summary);
     }
@@ -89,9 +90,19 @@ export async function loadGame(id: string): Promise<InternalGame> {
     ),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    lastRemindedAt: row.last_reminded_at,
   };
   cache.set(game.id, game);
   return game;
+}
+
+export async function markReminded(gameId: string): Promise<void> {
+  const { rows } = await pool.query(
+    `UPDATE games SET last_reminded_at = now() WHERE id = $1 RETURNING last_reminded_at`,
+    [gameId]
+  );
+  const cached = cache.get(gameId);
+  if (cached) cached.lastRemindedAt = rows[0].last_reminded_at;
 }
 
 export async function persistGame(game: InternalGame): Promise<void> {

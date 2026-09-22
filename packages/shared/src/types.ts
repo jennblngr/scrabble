@@ -68,6 +68,7 @@ export interface GameSummary {
   currentPlayerId: string;
   createdAt: string;
   updatedAt: string;
+  lastRemindedAt: string | null;
 }
 
 export interface WordResult {

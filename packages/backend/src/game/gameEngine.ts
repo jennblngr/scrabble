@@ -19,6 +19,7 @@ export interface InternalGame {
   isFirstMove: boolean;
   createdAt: string;
   updatedAt: string;
+  lastRemindedAt: string | null;
 }
 
 export function createGame(player1Username: string, player2Username: string): InternalGame {
@@ -44,6 +45,7 @@ export function createGame(player1Username: string, player2Username: string): In
     isFirstMove: true,
     createdAt: now,
     updatedAt: now,
+    lastRemindedAt: null,
   };
 }
 

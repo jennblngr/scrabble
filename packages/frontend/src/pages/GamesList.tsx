@@ -140,10 +140,14 @@ function GameRow({ game, username, onOpen }: { game: GameSummary; username: stri
           : "Perdue"
       : null;
 
-  // TEMP: condition 24h désactivée pour visualiser le bouton — à remettre après.
+  const lastActivity =
+    game.lastRemindedAt && new Date(game.lastRemindedAt) > new Date(game.updatedAt)
+      ? game.lastRemindedAt
+      : game.updatedAt;
   const canRemind =
     game.status !== "finished" &&
-    !isMyTurn; /* && Date.now() - new Date(game.updatedAt).getTime() >= REMINDER_DELAY_MS */
+    !isMyTurn &&
+    Date.now() - new Date(lastActivity).getTime() >= REMINDER_DELAY_MS;
 
   async function handleRemind(e: React.MouseEvent) {
     e.stopPropagation();
