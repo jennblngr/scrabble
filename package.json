@@ -1,0 +1,15 @@
+{
+  "name": "scrabble",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:backend": "npm run dev --workspace packages/backend",
+    "dev:frontend": "npm run dev --workspace packages/frontend",
+    "build:backend": "npm run build --workspace packages/backend",
+    "build:frontend": "npm run build --workspace packages/frontend",
+    "build": "npm run build:backend && npm run build:frontend",
+    "db:migrate": "npm run db:migrate --workspace packages/backend"
+  }
+}

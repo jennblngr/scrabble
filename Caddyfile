@@ -1,0 +1,18 @@
+{$DOMAIN:scrabble.example.com} {
+	root * /srv/frontend
+	encode gzip zstd
+
+	# Socket.io and REST API go to the backend container
+	handle /socket.io/* {
+		reverse_proxy backend:4000
+	}
+	handle /api/* {
+		reverse_proxy backend:4000
+	}
+
+	# Everything else: serve the PWA, falling back to index.html for client routing
+	handle {
+		try_files {path} /index.html
+		file_server
+	}
+}
