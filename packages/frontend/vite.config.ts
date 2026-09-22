@@ -13,7 +13,11 @@ export default defineConfig({
       strategies: "injectManifest",
       srcDir: "src",
       filename: "sw.ts",
-      includeAssets: ["icons/icon-192.png", "icons/icon-512.png"],
+      includeAssets: [
+        "icons/icon-192.png",
+        "icons/icon-512.png",
+        "icons/icon-512-maskable.png",
+      ],
       manifest: {
         name: "Scrabble",
         short_name: "Scrabble",
@@ -23,8 +27,14 @@ export default defineConfig({
         background_color: "#faf6ee",
         theme_color: "#2f6f4e",
         icons: [
-          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          {
+            src: "/icons/icon-512-maskable.png",
+            sizes: "512x512",
+            type: "image/png",
+            purpose: "maskable",
+          },
         ],
       },
       // Precaching + navigation fallback (incl. the /api and /socket.io denylist) are
