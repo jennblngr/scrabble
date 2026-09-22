@@ -1,10 +1,11 @@
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json* ./
-COPY packages/shared/package.json packages/shared/package.json
+# Copied in full (not just package.json) because `npm install`'s postinstall
+# hook compiles it — it needs the actual source to be there already.
+COPY packages/shared packages/shared
 COPY packages/backend/package.json packages/backend/package.json
 RUN npm install
-COPY packages/shared packages/shared
 COPY packages/backend packages/backend
 RUN npm run build --workspace packages/backend
 
