@@ -10,8 +10,8 @@ packages/
   backend/   API Fastify, Socket.io, moteur de jeu, accès PostgreSQL
   frontend/  PWA React (Vite), plateau, chevalet, connexion temps réel
 docker-compose.yml       Postgres seul, pour le développement local
-docker-compose.prod.yml  Postgres + backend + Caddy, pour le VPS
-Caddyfile                reverse proxy HTTPS automatique (Let's Encrypt)
+docker-compose.prod.yml  Postgres + backend, pour le VPS (pas de reverse proxy inclus)
+nginx/scrabble.conf       config nginx à installer sur le VPS (reverse proxy + TLS via certbot)
 ```
 
 ## Démarrage en local
@@ -45,13 +45,19 @@ Renseigner `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` dans `.env
 
 ## Déploiement sur le VPS
 
-1. Copier le repo sur le VPS, remplir `.env` (avec de vrais secrets), pointer le nom de domaine vers l'IP du VPS.
-2. Adapter `Caddyfile` : remplacer `scrabble.example.com` par votre domaine, ou définir la variable d'environnement `DOMAIN`.
-3. Construire le frontend : `npm run build:frontend` (génère `packages/frontend/dist`, servi statiquement par Caddy).
-4. Lancer la stack : `docker compose -f docker-compose.prod.yml up -d --build`
-5. Appliquer le schéma sur la base de prod : `docker compose -f docker-compose.prod.yml exec backend node dist/db/migrate.js`
+Ce projet ne fournit pas son propre reverse proxy : sur un VPS mutualisé qui héberge déjà d'autres sites, ports 80/443 sont possédés par le nginx du système, pas par un conteneur dédié. Le backend n'écoute qu'en local (`127.0.0.1:4000`), et nginx fait le lien.
 
-Caddy obtient et renouvelle automatiquement le certificat Let's Encrypt pour le domaine configuré.
+1. Copier le repo sur le VPS, remplir `.env` (avec de vrais secrets — attention, chaque `$` d'un hash bcrypt doit être doublé en `$$`, sinon Docker Compose le corrompt en l'interprétant comme une variable). Pointer le nom de domaine vers l'IP du VPS.
+2. Construire le frontend : `npm run build:frontend` (génère `packages/frontend/dist`, servi statiquement par nginx).
+3. Lancer la stack : `docker compose -f docker-compose.prod.yml up -d --build`
+4. Appliquer le schéma sur la base de prod : `docker compose -f docker-compose.prod.yml exec backend node dist/db/migrate.js`
+5. Installer la config nginx et obtenir le certificat TLS :
+   ```bash
+   sudo cp nginx/scrabble.conf /etc/nginx/sites-available/scrabble.jennblngr.com
+   sudo ln -s /etc/nginx/sites-available/scrabble.jennblngr.com /etc/nginx/sites-enabled/
+   sudo nginx -t && sudo systemctl reload nginx
+   sudo certbot --nginx -d scrabble.jennblngr.com
+   ```
 
 ## Statut de l'implémentation
 
@@ -59,6 +65,6 @@ Déjà en place :
 - Plateau 15x15 avec les cases bonus standard, sac et distribution des lettres françaises (102 tuiles)
 - Validation des règles de pose (alignement, connexion, case centrale, mots formés) et calcul du score (bonus lettre/mot, scrabble +50)
 - Synchronisation temps réel via Socket.io (pose, passe, échange, chat), persistance PostgreSQL, notifications push Web Push
-- PWA installable (manifest + service worker via `vite-plugin-pwa`), interface tactile pense-mobile (sélection tuile puis case, pas de drag-and-drop)
+- PWA installable (manifest + service worker via `vite-plugin-pwa`), plateau zoomable au pincement, pose des tuiles par glisser-déposer tactile (rack ↔ plateau)
 
-À affiner ensuite : vrai dictionnaire, gestion des reconnexions/plusieurs parties en parallèle, historique des coups affiché en UI, icônes PWA définitives (celles fournies sont des carrés unis de remplacement).
+À affiner ensuite : gestion des reconnexions/plusieurs parties en parallèle, historique des coups affiché en UI, icônes PWA définitives (celles fournies sont des carrés unis de remplacement).

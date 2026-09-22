@@ -6,6 +6,4 @@ build/
 !.env.example
 *.log
 .DS_Store
-caddy_data/
-caddy_config/
 pgdata/

@@ -22,26 +22,14 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+    # Bound to localhost only: the host's own nginx (already reverse-proxying
+    # the VPS's other sites, and owning ports 80/443) proxies to this port.
+    # There is no bundled Caddy/TLS container here — see nginx/scrabble.conf.
+    ports:
+      - "127.0.0.1:4000:4000"
     depends_on:
       postgres:
         condition: service_healthy
 
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    env_file: .env
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./packages/frontend/dist:/srv/frontend:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - backend
-
 volumes:
   pgdata:
-  caddy_data:
-  caddy_config:
