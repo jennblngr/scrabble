@@ -35,7 +35,7 @@ export function Tile({
         isBlank ? " tile--blank" : ""
       }${draggable ? " tile--draggable" : ""}`}
       onClick={onClick}
-      disabled={!onClick && !draggable}
+      aria-disabled={!onClick && !draggable}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
