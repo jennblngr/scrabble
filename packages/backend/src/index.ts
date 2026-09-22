@@ -2,7 +2,7 @@ import Fastify from "fastify";
 import { config } from "./config.js";
 import { registerAuth, getUsernameFromRequest } from "./auth/auth.js";
 import { createNewGame, listGames, loadGame, markReminded } from "./game/store.js";
-import { saveSubscription, notifyUser } from "./push.js";
+import { saveSubscription, notifyUser, notifyUserDebug } from "./push.js";
 import { setupSocket } from "./socket/index.js";
 
 const app = Fastify({ logger: true });
@@ -63,6 +63,18 @@ app.post<{ Body: { subscription: { endpoint: string; keys: { p256dh: string; aut
     return { ok: true };
   }
 );
+
+// DEBUG: lets the logged-in user send themselves a test push notification. Remove once
+// the push notification flow has been verified end-to-end.
+app.post("/api/push/test", async (req, reply) => {
+  const username = getUsernameFromRequest(req);
+  if (!username) return reply.code(401).send({ error: "Non authentifié" });
+  const debug = await notifyUserDebug(username, {
+    title: "Scrabble (test)",
+    body: "Si tu vois ceci, les notifications fonctionnent !",
+  });
+  return { ok: true, ...debug };
+});
 
 await app.ready();
 setupSocket(app, app.server);
