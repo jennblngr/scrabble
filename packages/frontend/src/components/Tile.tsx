@@ -30,6 +30,7 @@ export function Tile({
   return (
     <button
       type="button"
+      tabIndex={-1}
       className={`tile${selected ? " tile--selected" : ""}${faded ? " tile--faded" : ""}${
         isBlank ? " tile--blank" : ""
       }${draggable ? " tile--draggable" : ""}`}
