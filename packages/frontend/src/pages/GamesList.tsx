@@ -3,7 +3,6 @@ import type { GameSummary } from "@scrabble/shared";
 import { listGames, createGame, remindOpponent } from "../api/games";
 import { logout } from "../api/auth";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { sendTestPush } from "../push";
 
 interface GamesListProps {
   username: string;
@@ -17,7 +16,6 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
-  const [testPushStatus, setTestPushStatus] = useState<string | null>(null);
 
   function refresh() {
     listGames()
@@ -37,29 +35,6 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
       setError((err as Error).message);
     } finally {
       setCreating(false);
-    }
-  }
-
-  async function handleTestPush() {
-    setTestPushStatus("Envoi...");
-    try {
-      const result = await sendTestPush();
-      if (!result.vapidConfigured) {
-        setTestPushStatus("Échec : VAPID_PUBLIC_KEY/VAPID_PRIVATE_KEY non configurées côté serveur.");
-      } else if (result.subscriptionCount === 0) {
-        setTestPushStatus("Échec : aucun abonnement push enregistré pour ce compte côté serveur.");
-      } else {
-        const failed = result.results.filter((r) => !r.ok);
-        setTestPushStatus(
-          failed.length === 0
-            ? `Notification envoyée à ${result.subscriptionCount} abonnement(s).`
-            : `${result.results.length - failed.length}/${result.results.length} envoyée(s). Échecs: ${failed
-                .map((f) => f.error)
-                .join(" | ")}`
-        );
-      }
-    } catch (err) {
-      setTestPushStatus((err as Error).message);
     }
   }
 
@@ -95,12 +70,6 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
       <button type="button" className="games-list__new" onClick={handleCreate} disabled={creating}>
         {creating ? "Création..." : "+ Nouvelle partie"}
       </button>
-
-      {/* DEBUG: bouton temporaire pour tester les notifications push, à retirer une fois validé. */}
-      <button type="button" className="games-list__new" onClick={handleTestPush}>
-        🔔 Tester une notification (debug)
-      </button>
-      {testPushStatus && <p className="games-list__empty">{testPushStatus}</p>}
 
       {games === null ? (
         <p className="games-list__empty">Chargement...</p>

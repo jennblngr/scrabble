@@ -6,19 +6,13 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
 }
 
 export async function subscribeToPush(): Promise<void> {
-  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
-    throw new Error("Ce navigateur ne supporte pas les notifications push (Web Push)");
-  }
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
   const permission = await Notification.requestPermission();
-  if (permission !== "granted") {
-    throw new Error(`Permission de notification: "${permission}" (pas "granted")`);
-  }
+  if (permission !== "granted") return;
 
   const { publicKey } = await fetch("/api/push/vapid-public-key").then((r) => r.json());
-  if (!publicKey) {
-    throw new Error("Clé VAPID publique manquante côté serveur (variables d'env non configurées)");
-  }
+  if (!publicKey) return;
 
   const registration = await navigator.serviceWorker.ready;
   const existing = await registration.pushManager.getSubscription();
@@ -35,20 +29,4 @@ export async function subscribeToPush(): Promise<void> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ subscription: subscription.toJSON() }),
   });
-}
-
-// DEBUG: triggers a test push notification to the logged-in user, and returns diagnostics
-// about what actually happened. Remove once the push notification flow has been verified
-// end-to-end (along with its call site and button).
-export interface TestPushResult {
-  vapidConfigured: boolean;
-  subscriptionCount: number;
-  results: { endpoint: string; ok: boolean; error?: string }[];
-}
-
-export async function sendTestPush(): Promise<TestPushResult> {
-  await subscribeToPush();
-  const res = await fetch("/api/push/test", { method: "POST", credentials: "include" });
-  if (!res.ok) throw new Error("Échec de l'envoi de la notification de test");
-  return res.json();
 }
