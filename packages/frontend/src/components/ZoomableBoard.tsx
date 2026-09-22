@@ -1,4 +1,4 @@
-import { useRef, useState, type PointerEvent as ReactPointerEvent, type WheelEvent as ReactWheelEvent } from "react";
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import type { Board as BoardType, MoveResult, PlacedTile } from "@scrabble/shared";
 import { Board } from "./Board";
 
@@ -186,16 +186,29 @@ export function ZoomableBoard({ board, pending, preview, dragHandlers }: Zoomabl
   }
 
   // Lets a trackpad pinch (delivered as a ctrl-modified wheel event) or
-  // ctrl/cmd+scroll zoom the board on desktop too.
-  function handleWheel(e: ReactWheelEvent<HTMLDivElement>) {
-    if (!e.ctrlKey && !e.metaKey) return;
-    e.preventDefault();
-    const factor = Math.exp(-e.deltaY * 0.01);
-    zoomAt(zoomRef.current * factor, { x: e.clientX, y: e.clientY }, zoomRef.current, panRef.current);
-  }
+  // ctrl/cmd+scroll zoom the board on desktop too. Attached as a native,
+  // non-passive listener: React attaches its own `onWheel` prop as passive
+  // (for scroll performance), so `preventDefault()` inside it is silently
+  // ignored by the browser and logs an "Unable to preventDefault inside
+  // passive event listener" warning instead of actually stopping the page
+  // from zooming/scrolling underneath the gesture.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+
+    function handleWheel(e: WheelEvent) {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      const factor = Math.exp(-e.deltaY * 0.01);
+      zoomAt(zoomRef.current * factor, { x: e.clientX, y: e.clientY }, zoomRef.current, panRef.current);
+    }
+
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, []);
 
   return (
-    <div ref={viewportRef} className="board-viewport" onPointerDown={handlePointerDown} onWheel={handleWheel}>
+    <div ref={viewportRef} className="board-viewport" onPointerDown={handlePointerDown}>
       <div
         className="board-viewport__inner"
         style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
