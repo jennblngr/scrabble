@@ -10,6 +10,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      strategies: "injectManifest",
+      srcDir: "src",
+      filename: "sw.ts",
       includeAssets: ["icons/icon-192.png", "icons/icon-512.png"],
       manifest: {
         name: "Scrabble",
@@ -24,9 +27,10 @@ export default defineConfig({
           { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
         ],
       },
-      workbox: {
-        // Never cache the Socket.io transport or REST API calls.
-        navigateFallbackDenylist: [/^\/api/, /^\/socket\.io/],
+      // Precaching + navigation fallback (incl. the /api and /socket.io denylist) are
+      // handled directly in src/sw.ts since push/notificationclick need a custom service worker.
+      injectManifest: {
+        injectionPoint: "self.__WB_MANIFEST",
       },
     }),
   ],
