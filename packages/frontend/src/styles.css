@@ -15,7 +15,6 @@
 
   --tile-bg: #f1dba8;
   --tile-border: #c9a661;
-  --tile-blank-bg: #e7ce93;
   --tile-text: #2b2620;
   --tile-shadow: 0 1px 2px rgba(31, 30, 29, 0.18);
 
@@ -50,7 +49,6 @@
 
     --tile-bg: #d9c290;
     --tile-border: #a9895a;
-    --tile-blank-bg: #c7ae7c;
     --tile-text: #2b2620;
     --tile-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 
@@ -84,7 +82,6 @@
 
   --tile-bg: #d9c290;
   --tile-border: #a9895a;
-  --tile-blank-bg: #c7ae7c;
   --tile-text: #2b2620;
   --tile-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 
@@ -570,7 +567,6 @@ body {
 }
 
 .tile--blank {
-  background: var(--tile-blank-bg);
   text-decoration: underline;
 }
 
