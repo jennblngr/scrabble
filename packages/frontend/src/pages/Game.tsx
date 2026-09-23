@@ -50,6 +50,11 @@ export function Game({ username, gameId, onBack }: GameProps) {
   const [rackOrder, setRackOrder] = useState<string[]>([]);
   const [drag, setDrag] = useState<DragVisual | null>(null);
   const dragPendingRef = useRef<PendingDrag | null>(null);
+  const [justPlayed, setJustPlayed] = useState<string | null>(null);
+  // Guards against flashing the score box for the lastMove already present in
+  // the very first game:state received after (re)joining, which may be stale
+  // (e.g. from before a page reload) rather than a move just played now.
+  const hasReceivedStateRef = useRef(false);
 
   useEffect(() => {
     const socket = getSocket();
@@ -57,9 +62,21 @@ export function Game({ username, gameId, onBack }: GameProps) {
     setError(null);
     setPending([]);
     setPreview(null);
+    setJustPlayed(null);
+    hasReceivedStateRef.current = false;
 
     socket.on("game:state", (s) => {
-      setState(s);
+      setState((prev) => {
+        const lastMoveChanged =
+          hasReceivedStateRef.current &&
+          s.lastMove &&
+          (prev?.lastMove?.username !== s.lastMove.username ||
+            prev?.lastMove?.score !== s.lastMove.score ||
+            prev?.lastMove?.words.join("|") !== s.lastMove.words.join("|"));
+        if (lastMoveChanged) setJustPlayed(s.lastMove!.username);
+        return s;
+      });
+      hasReceivedStateRef.current = true;
       setPending([]);
       setPreview(null);
     });
@@ -100,6 +117,12 @@ export function Game({ username, gameId, onBack }: GameProps) {
       clearTimeout(clearTimeout_);
     };
   }, [error]);
+
+  useEffect(() => {
+    if (!justPlayed) return;
+    const timeout = setTimeout(() => setJustPlayed(null), 5000);
+    return () => clearTimeout(timeout);
+  }, [justPlayed]);
 
   const me = useMemo(() => state?.players.find((p) => p.username === username) ?? null, [state, username]);
   const opponent = useMemo(() => state?.players.find((p) => p.username !== username) ?? null, [state, username]);
@@ -402,11 +425,19 @@ export function Game({ username, gameId, onBack }: GameProps) {
       </header>
 
       <div className="scores">
-        <div className={`scores__col${isMyTurn ? " scores__col--active" : ""}`}>
+        <div
+          className={`scores__col${
+            justPlayed === username ? " scores__col--success" : isMyTurn ? " scores__col--active" : ""
+          }`}
+        >
           <span className="scores__name">Vous</span>
           <span className="scores__value">{me?.score ?? 0}</span>
         </div>
-        <div className={`scores__col scores__col--right${!isMyTurn ? " scores__col--active" : ""}`}>
+        <div
+          className={`scores__col scores__col--right${
+            justPlayed === opponent?.username ? " scores__col--success" : !isMyTurn ? " scores__col--active" : ""
+          }`}
+        >
           <span className="scores__name">{opponent?.username}</span>
           <span className="scores__value">{opponent?.score ?? 0}</span>
         </div>
