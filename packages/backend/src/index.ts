@@ -21,6 +21,15 @@ app.post("/api/games", async (req, reply) => {
   const username = getUsernameFromRequest(req);
   if (!username) return reply.code(401).send({ error: "Non authentifié" });
   const game = await createNewGame();
+
+  const opponent = game.players.find((p) => p.username !== username);
+  if (opponent) {
+    await notifyUser(opponent.username, {
+      title: "Scrabble",
+      body: `${username} a lancé une nouvelle partie !`,
+    });
+  }
+
   return { gameId: game.id };
 });
 
