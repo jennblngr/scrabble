@@ -88,6 +88,19 @@ export function Game({ username, gameId, onBack }: GameProps) {
     getSocket().emit("game:preview", { gameId, tiles: pending });
   }, [pending, gameId]);
 
+  const [errorFading, setErrorFading] = useState(false);
+
+  useEffect(() => {
+    if (!error) return;
+    setErrorFading(false);
+    const fadeTimeout = setTimeout(() => setErrorFading(true), 5000);
+    const clearTimeout_ = setTimeout(() => setError(null), 5300);
+    return () => {
+      clearTimeout(fadeTimeout);
+      clearTimeout(clearTimeout_);
+    };
+  }, [error]);
+
   const me = useMemo(() => state?.players.find((p) => p.username === username) ?? null, [state, username]);
   const opponent = useMemo(() => state?.players.find((p) => p.username !== username) ?? null, [state, username]);
   const isMyTurn = state?.currentPlayerId === username;
@@ -367,8 +380,12 @@ export function Game({ username, gameId, onBack }: GameProps) {
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
         </button>
-        <div className="game__status">
-          {state.status === "finished"
+        <div
+          className={`game__status${error ? ` game__status--error${errorFading ? " game__status--error-fading" : ""}` : ""}`}
+        >
+          {error
+            ? error
+            : state.status === "finished"
             ? "Partie terminée"
             : lastMoveText ??
               (isMyTurn ? (
@@ -394,8 +411,6 @@ export function Game({ username, gameId, onBack }: GameProps) {
           <span className="scores__value">{opponent?.score ?? 0}</span>
         </div>
       </div>
-
-      {error && <p className="game__error">{error}</p>}
 
       <div className="game__board-area">
         <ZoomableBoard board={state.board} pending={pending} preview={preview} dragHandlers={boardDragHandlers} />

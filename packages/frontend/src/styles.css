@@ -406,6 +406,20 @@ body {
   color: var(--color-accent);
 }
 
+.game__status--error {
+  color: var(--color-error);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+.game__status--error-fading {
+  opacity: 0;
+}
+
 .game__error {
   color: var(--color-error);
   font-weight: 600;
