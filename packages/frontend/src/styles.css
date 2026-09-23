@@ -310,6 +310,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .game__header {
@@ -317,6 +320,16 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-shrink: 0;
+}
+
+.game__board-area {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
 }
 
 .game__header > button {
@@ -334,6 +347,7 @@ body {
   display: flex;
   gap: 10px;
   max-width: 100%;
+  flex-shrink: 0;
 }
 
 .scores__col {
@@ -396,6 +410,7 @@ body {
   color: var(--color-error);
   font-weight: 600;
   margin: 0;
+  flex-shrink: 0;
 }
 
 .game__bag {
@@ -403,12 +418,15 @@ body {
   color: var(--color-text-muted);
   text-align: center;
   margin: 0;
+  flex-shrink: 0;
 }
 
 .board-viewport {
   position: relative;
   width: 100%;
   max-width: 100%;
+  width: min(100cqw, 100cqh);
+  max-height: 100%;
   aspect-ratio: 1;
   overflow: hidden;
   border-radius: 8px;
@@ -498,6 +516,7 @@ body {
   justify-content: center;
   flex-wrap: wrap;
   min-height: 46px;
+  flex-shrink: 0;
 }
 
 .rack__slot {
@@ -590,6 +609,7 @@ body {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .game__actions button {
@@ -616,6 +636,7 @@ body {
   width: 100%;
   max-width: 100%;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .game__validate-row .primary {

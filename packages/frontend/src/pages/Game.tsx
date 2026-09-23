@@ -397,7 +397,9 @@ export function Game({ username, gameId, onBack }: GameProps) {
 
       {error && <p className="game__error">{error}</p>}
 
-      <ZoomableBoard board={state.board} pending={pending} preview={preview} dragHandlers={boardDragHandlers} />
+      <div className="game__board-area">
+        <ZoomableBoard board={state.board} pending={pending} preview={preview} dragHandlers={boardDragHandlers} />
+      </div>
 
       <p className="game__bag">Tuiles restantes dans le sac : {state.bagCount}</p>
 
