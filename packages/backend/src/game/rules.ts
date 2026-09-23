@@ -137,7 +137,7 @@ function extractWord(
 
   let startRow = row;
   let startCol = col;
-  while (occupied(startRow - dr, startCol - dc) !== null) {
+  while (startRow - dr >= 0 && startCol - dc >= 0 && occupied(startRow - dr, startCol - dc) !== null) {
     startRow -= dr;
     startCol -= dc;
   }
