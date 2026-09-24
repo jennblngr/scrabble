@@ -25,6 +25,22 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
 
   useEffect(refresh, []);
 
+  // Reprendre l'app depuis l'arrière-plan (PWA remise au premier plan, onglet
+  // réactivé, retour depuis le cache de navigation) ne remonte pas ce
+  // composant : sans ça, la liste resterait figée tant qu'on ne force pas un
+  // rechargement manuel.
+  useEffect(() => {
+    function onVisible() {
+      if (document.visibilityState === "visible") refresh();
+    }
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("pageshow", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("pageshow", onVisible);
+    };
+  }, []);
+
   async function handleCreate() {
     setError(null);
     setCreating(true);
