@@ -59,6 +59,35 @@ Ce projet ne fournit pas son propre reverse proxy : sur un VPS mutualisé qui h�
    sudo certbot --nginx -d scrabble.jennblngr.com
    ```
 
+### Déploiement continu (GitHub Actions)
+
+Chaque push sur `main` déclenche `.github/workflows/deploy.yml` :
+
+1. **Build check** : `npm ci` + `npm run build` (typecheck et build de shared, backend, frontend). Si ça casse, rien n'est déployé.
+2. **Deploy** : connexion SSH au VPS, `git fetch` + `git reset --hard <commit>` dans `/var/www/scrabble`, puis `scripts/deploy.sh` (rebuild du frontend, rebuild/redémarrage du conteneur backend, application du schéma).
+
+Le workflow peut aussi être relancé à la main depuis l'onglet *Actions* (`workflow_dispatch`). Les secrets applicatifs restent dans le `.env` du VPS (y compris les `VITE_*` lus au build du frontend) : GitHub n'a besoin que de l'accès SSH.
+
+Mise en place (une seule fois) :
+
+1. Sur le VPS, le repo doit être un **clone git** dans `/var/www/scrabble` (pas une copie), capable de faire `git fetch` sans intervention : si le repo est privé, ajouter une *deploy key* en lecture seule (GitHub → *Settings → Deploy keys*) et cloner en SSH (`git@github.com:jennblngr/scrabble.git`).
+2. L'utilisateur utilisé pour le déploiement doit posséder ce dossier, être dans le groupe `docker`, et avoir Node 22 + npm installés.
+3. Générer une paire de clés dédiée au déploiement et autoriser la clé publique sur le VPS :
+   ```bash
+   ssh-keygen -t ed25519 -f scrabble_deploy -N "" -C "github-actions-deploy"
+   ssh-copy-id -i scrabble_deploy.pub <user>@<vps>
+   ssh-keyscan -p 22 <vps>   # sortie à coller dans VPS_SSH_KNOWN_HOSTS
+   ```
+4. Dans GitHub → *Settings → Environments*, créer l'environnement `production` et y ajouter les secrets :
+   - `VPS_HOST` : IP ou nom d'hôte du VPS
+   - `VPS_USER` : utilisateur SSH
+   - `VPS_SSH_KEY` : contenu de la clé **privée** `scrabble_deploy`
+   - `VPS_SSH_KNOWN_HOSTS` : sortie de `ssh-keyscan`
+   - `VPS_PORT` (optionnel, 22 par défaut)
+   - variable `VPS_APP_DIR` (optionnelle, `/var/www/scrabble` par défaut)
+
+Pour déployer à la main depuis le VPS : `git fetch origin && git reset --hard origin/main && ./scripts/deploy.sh`.
+
 ## Statut de l'implémentation
 
 Déjà en place :
