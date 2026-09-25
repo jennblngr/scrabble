@@ -40,6 +40,47 @@ interface DragVisual {
 // doesn't briefly flash a ghost tile on ordinary taps/clicks.
 const DRAG_THRESHOLD = 6;
 
+// Timing for the "move just validated" animation: each newly placed tile on
+// the board pops up in sequence (a little wave), and the score counter ticks
+// up in sync, finishing right as the last tile settles back down.
+const TILE_STAGGER_MS = 130;
+const TILE_ANIM_MS = 550;
+
+function waveDuration(tileCount: number) {
+  return Math.max(tileCount - 1, 0) * TILE_STAGGER_MS + TILE_ANIM_MS;
+}
+
+interface ScoreAnim {
+  username: string;
+  from: number;
+  to: number;
+  tileCount: number;
+}
+
+// Bumps the displayed score up one step each time a tile hits peak scale
+// (the midpoint of its wave animation, see `.tile--wave` in styles.css),
+// landing on `anim.to` exactly when the last tile peaks.
+function useDisplayedScore(value: number, anim: ScoreAnim | null) {
+  const [display, setDisplay] = useState(value);
+
+  useEffect(() => {
+    if (!anim) {
+      setDisplay(value);
+      return;
+    }
+    const { from, to, tileCount } = anim;
+    setDisplay(from);
+    const timeouts = Array.from({ length: tileCount }, (_, i) => {
+      const peakAt = i * TILE_STAGGER_MS + TILE_ANIM_MS / 2;
+      const stepValue = from + Math.round(((to - from) * (i + 1)) / tileCount);
+      return setTimeout(() => setDisplay(stepValue), peakAt);
+    });
+    return () => timeouts.forEach(clearTimeout);
+  }, [anim, value]);
+
+  return display;
+}
+
 export function Game({ username, gameId, onBack }: GameProps) {
   const [state, setState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +91,9 @@ export function Game({ username, gameId, onBack }: GameProps) {
   const [rackOrder, setRackOrder] = useState<string[]>([]);
   const [drag, setDrag] = useState<DragVisual | null>(null);
   const dragPendingRef = useRef<PendingDrag | null>(null);
-  const [justPlayed, setJustPlayed] = useState<string | null>(null);
+  const [scoreAnim, setScoreAnim] = useState<ScoreAnim | null>(null);
+  // Maps "row,col" of a just-placed tile to its wave animation delay (ms).
+  const [waveCells, setWaveCells] = useState<Map<string, number>>(new Map());
   // Guards against flashing the score box for the lastMove already present in
   // the very first game:state received after (re)joining, which may be stale
   // (e.g. from before a page reload) rather than a move just played now.
@@ -63,7 +106,8 @@ export function Game({ username, gameId, onBack }: GameProps) {
     setError(null);
     setPending([]);
     setPreview(null);
-    setJustPlayed(null);
+    setScoreAnim(null);
+    setWaveCells(new Map());
     hasReceivedStateRef.current = false;
     stateRef.current = null;
 
@@ -74,7 +118,33 @@ export function Game({ username, gameId, onBack }: GameProps) {
         (prev?.lastMove?.username !== s.lastMove.username ||
           prev?.lastMove?.score !== s.lastMove.score ||
           prev?.lastMove?.words.join("|") !== s.lastMove.words.join("|"));
-      if (hasReceivedStateRef.current && lastMoveChanged) setJustPlayed(s.lastMove!.username);
+
+      if (hasReceivedStateRef.current && lastMoveChanged) {
+        const playerId = s.lastMove!.username;
+
+        // Diff against the previous board to find the tiles this move just
+        // placed, so only those get the wave animation (not tiles already on
+        // the board from earlier moves).
+        const newCells: { row: number; col: number }[] = [];
+        if (prev) {
+          for (const line of s.board) {
+            for (const cell of line) {
+              if (cell.letter !== null && prev.board[cell.row][cell.col].letter === null) {
+                newCells.push({ row: cell.row, col: cell.col });
+              }
+            }
+          }
+        }
+        newCells.sort((a, b) => a.row - b.row || a.col - b.col);
+
+        const from = prev?.players.find((p) => p.username === playerId)?.score ?? s.lastMove!.score;
+        const to = s.players.find((p) => p.username === playerId)?.score ?? from;
+        const tileCount = Math.max(newCells.length, 1);
+
+        setScoreAnim({ username: playerId, from, to, tileCount });
+        setWaveCells(new Map(newCells.map((c, i) => [`${c.row},${c.col}`, i * TILE_STAGGER_MS])));
+      }
+
       // A state re-sent after a reconnect, where nothing was played, must not
       // wipe the tiles the player is currently arranging on the board.
       const somethingPlayed =
@@ -132,14 +202,23 @@ export function Game({ username, gameId, onBack }: GameProps) {
   }, [error]);
 
   useEffect(() => {
-    if (!justPlayed) return;
-    const timeout = setTimeout(() => setJustPlayed(null), 5000);
+    if (!scoreAnim) return;
+    // A little buffer after the last tile settles before clearing the animation.
+    const timeout = setTimeout(() => {
+      setScoreAnim(null);
+      setWaveCells(new Map());
+    }, waveDuration(scoreAnim.tileCount) + 300);
     return () => clearTimeout(timeout);
-  }, [justPlayed]);
+  }, [scoreAnim]);
 
   const me = useMemo(() => state?.players.find((p) => p.username === username) ?? null, [state, username]);
   const opponent = useMemo(() => state?.players.find((p) => p.username !== username) ?? null, [state, username]);
   const isMyTurn = state?.currentPlayerId === username;
+
+  const meAnim = scoreAnim?.username === username ? scoreAnim : null;
+  const opponentAnim = opponent && scoreAnim?.username === opponent.username ? scoreAnim : null;
+  const meDisplayScore = useDisplayedScore(me?.score ?? 0, meAnim);
+  const opponentDisplayScore = useDisplayedScore(opponent?.score ?? 0, opponentAnim);
 
   const lastMoveText = useMemo(() => {
     const lastMove = state?.lastMove;
@@ -438,26 +517,24 @@ export function Game({ username, gameId, onBack }: GameProps) {
       </header>
 
       <div className="scores">
-        <div
-          className={`scores__col${
-            justPlayed === username ? " scores__col--success" : isMyTurn ? " scores__col--active" : ""
-          }`}
-        >
+        <div className={`scores__col${isMyTurn ? " scores__col--active" : ""}`}>
           <span className="scores__name">Vous</span>
-          <span className="scores__value">{me?.score ?? 0}</span>
+          <span className="scores__value">{meDisplayScore}</span>
         </div>
-        <div
-          className={`scores__col scores__col--right${
-            justPlayed === opponent?.username ? " scores__col--success" : !isMyTurn ? " scores__col--active" : ""
-          }`}
-        >
+        <div className={`scores__col scores__col--right${!isMyTurn ? " scores__col--active" : ""}`}>
           <span className="scores__name">{opponent?.username}</span>
-          <span className="scores__value">{opponent?.score ?? 0}</span>
+          <span className="scores__value">{opponentDisplayScore}</span>
         </div>
       </div>
 
       <div className="game__board-area">
-        <ZoomableBoard board={state.board} pending={pending} preview={preview} dragHandlers={boardDragHandlers} />
+        <ZoomableBoard
+          board={state.board}
+          pending={pending}
+          preview={preview}
+          dragHandlers={boardDragHandlers}
+          waveCells={waveCells}
+        />
       </div>
 
       <p className="game__bag">Tuiles restantes dans le sac : {state.bagCount}</p>

@@ -7,6 +7,8 @@ interface TileProps {
   selected?: boolean;
   faded?: boolean;
   draggable?: boolean;
+  // When set, this tile plays its "just placed" wave animation after this delay (ms).
+  waveDelayMs?: number;
   onClick?: () => void;
   onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void;
   onPointerMove?: (e: PointerEvent<HTMLButtonElement>) => void;
@@ -20,6 +22,7 @@ export function Tile({
   selected,
   faded,
   draggable,
+  waveDelayMs,
   onClick,
   onPointerDown,
   onPointerMove,
@@ -33,7 +36,8 @@ export function Tile({
       tabIndex={-1}
       className={`tile${selected ? " tile--selected" : ""}${faded ? " tile--faded" : ""}${
         isBlank ? " tile--blank" : ""
-      }${draggable ? " tile--draggable" : ""}`}
+      }${draggable ? " tile--draggable" : ""}${waveDelayMs !== undefined ? " tile--wave" : ""}`}
+      style={waveDelayMs !== undefined ? { animationDelay: `${waveDelayMs}ms` } : undefined}
       onClick={onClick}
       aria-disabled={!onClick && !draggable}
       onPointerDown={onPointerDown}

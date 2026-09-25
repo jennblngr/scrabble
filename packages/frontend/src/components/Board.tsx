@@ -14,6 +14,8 @@ interface BoardProps {
   ) => {
     onPointerDown: (e: PointerEvent<HTMLButtonElement>) => void;
   };
+  // Maps "row,col" of a just-placed tile to its wave animation delay (ms).
+  waveCells?: Map<string, number>;
 }
 
 const BONUS_LABEL: Record<string, string> = {
@@ -24,7 +26,7 @@ const BONUS_LABEL: Record<string, string> = {
   CENTER: "★",
 };
 
-export function Board({ board, pending, preview, dragHandlers }: BoardProps) {
+export function Board({ board, pending, preview, dragHandlers, waveCells }: BoardProps) {
   const pendingByCell = new Map(pending.map((t) => [`${t.row},${t.col}`, t]));
 
   const previewCells = new Set(
@@ -80,15 +82,17 @@ export function Board({ board, pending, preview, dragHandlers }: BoardProps) {
           const letter = pendingTile?.letter ?? cell.letter;
           const isBlank = pendingTile?.isBlank ?? cell.isBlank;
           const showScore = key === scoreAnchor;
+          const waveDelayMs = waveCells?.get(key);
 
           if (letter !== null && letter !== undefined) {
             return (
-              <div key={key} className="board__cell">
+              <div key={key} className={`board__cell${waveDelayMs !== undefined ? " board__cell--wave" : ""}`}>
                 <Tile
                   letter={letter}
                   isBlank={isBlank}
                   faded={!!pendingTile}
                   draggable={!!pendingTile}
+                  waveDelayMs={waveDelayMs}
                   {...(pendingTile ? dragHandlers(cell.row, cell.col, letter, isBlank) : {})}
                 />
                 {showScore && <span className="board__cell__preview-score">{preview!.totalScore}</span>}
