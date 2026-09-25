@@ -4,7 +4,14 @@ import type { FastifyInstance } from "fastify";
 import type { ClientToServerEvents, ServerToClientEvents } from "@scrabble/shared";
 import { getUsernameFromCookieHeader } from "../auth/auth.js";
 import { loadGame, persistGame, recordMove } from "../game/store.js";
-import { applyExchange, applyPass, applyPlace, previewPlace, toPublicState } from "../game/gameEngine.js";
+import {
+  applyExchange,
+  applyPass,
+  applyPlace,
+  previewPlace,
+  toPublicState,
+  type InternalGame,
+} from "../game/gameEngine.js";
 import { MoveError } from "../game/rules.js";
 import { notifyUser } from "../push.js";
 
@@ -27,6 +34,15 @@ export function setupSocket(app: FastifyInstance, httpServer: HttpServer) {
   });
 
   io.on("connection", (socket) => {
+    // Rooms are per connection: after a reconnect this socket is no longer in
+    // the game room until the client re-joins. Joining here too guarantees the
+    // player who just acted always receives the resulting state.
+    function broadcastState(game: InternalGame) {
+      const room = `game:${game.id}`;
+      socket.join(room);
+      io.to(room).emit("game:state", toPublicState(game));
+    }
+
     socket.on("game:join", async (gameId) => {
       try {
         if (!gameId) throw new Error("gameId manquant.");
@@ -48,7 +64,7 @@ export function setupSocket(app: FastifyInstance, httpServer: HttpServer) {
         const result = applyPlace(game, socket.username, tiles);
         await persistGame(game);
         await recordMove(game.id, socket.username, "place", tiles, result.words, result.totalScore);
-        io.to(`game:${game.id}`).emit("game:state", toPublicState(game));
+        broadcastState(game);
         await notifyUser(game.currentPlayerId, {
           title: "Scrabble",
           body: `${socket.username} a joué et marqué ${result.totalScore} points. À toi de jouer !`,
@@ -73,7 +89,7 @@ export function setupSocket(app: FastifyInstance, httpServer: HttpServer) {
         applyPass(game, socket.username);
         await persistGame(game);
         await recordMove(game.id, socket.username, "pass", null, null, 0);
-        io.to(`game:${game.id}`).emit("game:state", toPublicState(game));
+        broadcastState(game);
       } catch (err) {
         socket.emit("game:error", errorMessage(err));
       }
@@ -85,7 +101,7 @@ export function setupSocket(app: FastifyInstance, httpServer: HttpServer) {
         applyExchange(game, socket.username, rackTileIds);
         await persistGame(game);
         await recordMove(game.id, socket.username, "exchange", rackTileIds, null, 0);
-        io.to(`game:${game.id}`).emit("game:state", toPublicState(game));
+        broadcastState(game);
       } catch (err) {
         socket.emit("game:error", errorMessage(err));
       }
