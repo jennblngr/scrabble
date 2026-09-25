@@ -55,6 +55,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
   // the very first game:state received after (re)joining, which may be stale
   // (e.g. from before a page reload) rather than a move just played now.
   const hasReceivedStateRef = useRef(false);
+  const stateRef = useRef<GameState | null>(null);
 
   useEffect(() => {
     const socket = getSocket();
@@ -64,26 +65,37 @@ export function Game({ username, gameId, onBack }: GameProps) {
     setPreview(null);
     setJustPlayed(null);
     hasReceivedStateRef.current = false;
+    stateRef.current = null;
 
     socket.on("game:state", (s) => {
-      setState((prev) => {
-        const lastMoveChanged =
-          hasReceivedStateRef.current &&
-          s.lastMove &&
-          (prev?.lastMove?.username !== s.lastMove.username ||
-            prev?.lastMove?.score !== s.lastMove.score ||
-            prev?.lastMove?.words.join("|") !== s.lastMove.words.join("|"));
-        if (lastMoveChanged) setJustPlayed(s.lastMove!.username);
-        return s;
-      });
+      const prev = stateRef.current;
+      const lastMoveChanged =
+        !!s.lastMove &&
+        (prev?.lastMove?.username !== s.lastMove.username ||
+          prev?.lastMove?.score !== s.lastMove.score ||
+          prev?.lastMove?.words.join("|") !== s.lastMove.words.join("|"));
+      if (hasReceivedStateRef.current && lastMoveChanged) setJustPlayed(s.lastMove!.username);
+      // A state re-sent after a reconnect, where nothing was played, must not
+      // wipe the tiles the player is currently arranging on the board.
+      const somethingPlayed =
+        !prev || lastMoveChanged || prev.currentPlayerId !== s.currentPlayerId || prev.status !== s.status;
+      stateRef.current = s;
       hasReceivedStateRef.current = true;
-      setPending([]);
-      setPreview(null);
+      setState(s);
+      if (somethingPlayed) {
+        setPending([]);
+        setPreview(null);
+      }
     });
     socket.on("game:error", (msg) => setError(msg));
     socket.on("game:preview", (result) => setPreview(result));
 
-    socket.emit("game:join", gameId);
+    // Socket.IO rooms don't survive a reconnection (e.g. the phone went to
+    // sleep or the network dropped): re-join on every (re)connect, otherwise
+    // this client stops receiving game:state and looks stuck after playing.
+    const join = () => socket.emit("game:join", gameId);
+    socket.on("connect", join);
+    if (socket.connected) join();
 
     subscribeToPush().catch(() => {
       /* notifications are a nice-to-have; ignore failures (e.g. permission denied) */
@@ -93,6 +105,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
       socket.off("game:state");
       socket.off("game:error");
       socket.off("game:preview");
+      socket.off("connect", join);
       socket.emit("game:leave", gameId);
     };
   }, [gameId]);
