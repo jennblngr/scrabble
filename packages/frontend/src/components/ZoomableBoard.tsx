@@ -14,6 +14,8 @@ interface ZoomableBoardProps {
   ) => {
     onPointerDown: (e: ReactPointerEvent<HTMLButtonElement>) => void;
   };
+  // Maps "row,col" of a just-placed tile to its wave animation delay (ms).
+  waveCells?: Map<string, number>;
 }
 
 const MIN_ZOOM = 1;
@@ -39,7 +41,7 @@ interface Gesture {
 // rest of the page stays non-zoomable via `touch-action: pan-x pan-y` on
 // `body` (see styles.css); this container fully opts out of native touch
 // handling (`touch-action: none`) and drives pan/zoom itself.
-export function ZoomableBoard({ board, pending, preview, dragHandlers }: ZoomableBoardProps) {
+export function ZoomableBoard({ board, pending, preview, dragHandlers, waveCells }: ZoomableBoardProps) {
   const [zoom, setZoomState] = useState(1);
   const [pan, setPanState] = useState<Point>({ x: 0, y: 0 });
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -213,7 +215,7 @@ export function ZoomableBoard({ board, pending, preview, dragHandlers }: Zoomabl
         className="board-viewport__inner"
         style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
       >
-        <Board board={board} pending={pending} preview={preview} dragHandlers={dragHandlers} />
+        <Board board={board} pending={pending} preview={preview} dragHandlers={dragHandlers} waveCells={waveCells} />
       </div>
 
       {zoom > 1 && (

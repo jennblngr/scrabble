@@ -393,19 +393,6 @@ body {
   color: var(--color-accent-contrast);
 }
 
-.scores__col--success {
-  border-color: transparent;
-  background: var(--preview-outline);
-}
-
-.scores__col--success .scores__name {
-  color: var(--color-accent-contrast);
-  opacity: 0.85;
-}
-
-.scores__col--success .scores__value {
-  color: var(--color-accent-contrast);
-}
 
 .game__status {
   flex: 1;
@@ -616,6 +603,26 @@ body {
 
 .tile--blank {
   text-decoration: underline;
+}
+
+.tile--wave {
+  animation: tile-wave 550ms ease-in-out;
+}
+
+/* Lifts the animating cell above its neighbors so the tile isn't clipped as
+   it scales up past the cell's own boundary. */
+.board__cell--wave {
+  z-index: 1;
+}
+
+@keyframes tile-wave {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.3);
+  }
 }
 
 .tile__value {
