@@ -3,13 +3,9 @@ name: Deploy
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
-
-# Never run two deploys on the VPS at the same time; a newer push waits for
-# the one in progress instead of interrupting it halfway.
-concurrency:
-  group: deploy-production
-  cancel-in-progress: false
 
 jobs:
   build:
@@ -29,8 +25,14 @@ jobs:
   deploy:
     name: Deploy to VPS
     needs: build
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
+    # Never run two deploys on the VPS at the same time; a newer push waits for
+    # the one in progress instead of interrupting it halfway.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
     steps:
       - name: Configure SSH
         env:
