@@ -52,6 +52,16 @@ jobs:
           echo "Lines in decoded key: $(wc -l < ~/.ssh/id_deploy)"
           ssh-keygen -lf ~/.ssh/id_deploy
 
+      - name: Debug VPS_USER / VPS_HOST values
+        env:
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          echo "VPS_USER length: ${#VPS_USER}"
+          echo -n "$VPS_USER" | sha256sum
+          echo "VPS_HOST length: ${#VPS_HOST}"
+          echo -n "$VPS_HOST" | sha256sum
+
       # .env and packages/frontend/dist are gitignored, so the reset keeps them.
       - name: Run deploy script on the VPS
         env:
