@@ -3,6 +3,9 @@ import type { GameSummary } from "@scrabble/shared";
 import { listGames, createGame, remindOpponent, deleteGame } from "../api/games";
 import { logout } from "../api/auth";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { Toast, type ToastState } from "../components/Toast";
+
+const REMINDER_DELAY_MS = 24 * 60 * 60 * 1000;
 
 interface GamesListProps {
   username: string;
@@ -10,12 +13,11 @@ interface GamesListProps {
   onOpenGame: (gameId: string) => void;
 }
 
-const REMINDER_DELAY_MS = 24 * 60 * 60 * 1000;
-
 export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps) {
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [toast, setToast] = useState<ToastState>(null);
 
   function refresh() {
     listGames()
@@ -113,7 +115,14 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
                     <h3>Votre tour</h3>
                     <ul className="games-list__items">
                       {myTurn.map((g) => (
-                        <GameRow key={g.id} game={g} username={username} onOpen={() => onOpenGame(g.id)} onDelete={() => handleDelete(g.id)} />
+                        <GameRow
+                          key={g.id}
+                          game={g}
+                          username={username}
+                          onOpen={() => onOpenGame(g.id)}
+                          onDelete={() => handleDelete(g.id)}
+                          onRemind={setToast}
+                        />
                       ))}
                     </ul>
                   </div>
@@ -123,7 +132,14 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
                     <h3>Son tour</h3>
                     <ul className="games-list__items">
                       {theirTurn.map((g) => (
-                        <GameRow key={g.id} game={g} username={username} onOpen={() => onOpenGame(g.id)} onDelete={() => handleDelete(g.id)} />
+                        <GameRow
+                          key={g.id}
+                          game={g}
+                          username={username}
+                          onOpen={() => onOpenGame(g.id)}
+                          onDelete={() => handleDelete(g.id)}
+                          onRemind={setToast}
+                        />
                       ))}
                     </ul>
                   </div>
@@ -139,13 +155,22 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
             ) : (
               <ul className="games-list__items">
                 {finished.map((g) => (
-                  <GameRow key={g.id} game={g} username={username} onOpen={() => onOpenGame(g.id)} onDelete={() => handleDelete(g.id)} />
+                  <GameRow
+                    key={g.id}
+                    game={g}
+                    username={username}
+                    onOpen={() => onOpenGame(g.id)}
+                    onDelete={() => handleDelete(g.id)}
+                    onRemind={setToast}
+                  />
                 ))}
               </ul>
             )}
           </section>
         </>
       )}
+
+      <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
   );
 }
@@ -155,14 +180,16 @@ function GameRow({
   username,
   onOpen,
   onDelete,
+  onRemind,
 }: {
   game: GameSummary;
   username: string;
   onOpen: () => void;
   onDelete: () => void;
+  onRemind: (toast: ToastState) => void;
 }) {
-  const [reminded, setReminded] = useState(false);
   const [reminding, setReminding] = useState(false);
+  const [remindHidden, setRemindHidden] = useState(false);
 
   const me = game.players.find((p) => p.username === username);
   const opponent = game.players.find((p) => p.username !== username);
@@ -191,9 +218,10 @@ function GameRow({
     setReminding(true);
     try {
       await remindOpponent(game.id);
-      setReminded(true);
+      setRemindHidden(true);
+      onRemind({ message: `Rappel envoyé avec succès à ${opponent?.username ?? "l'adversaire"} !`, variant: "success" });
     } catch {
-      // ignore: relance best-effort, l'utilisateur peut réessayer
+      onRemind({ message: `Échec de l'envoi du rappel à ${opponent?.username ?? "l'adversaire"}`, variant: "error" });
     } finally {
       setReminding(false);
     }
@@ -215,11 +243,12 @@ function GameRow({
       {canRemind && (
         <button
           type="button"
-          className="games-list__remind"
+          className={`games-list__remind${remindHidden ? " games-list__remind--hidden" : ""}`}
           onClick={handleRemind}
-          disabled={reminding || reminded}
-          aria-label={reminded ? "Notification envoyée" : "Relancer"}
-          title={reminded ? "Notification envoyée" : "Relancer"}
+          disabled={reminding || remindHidden}
+          aria-hidden={remindHidden}
+          aria-label="Relancer"
+          title="Relancer"
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
