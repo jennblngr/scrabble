@@ -14,8 +14,12 @@ interface BoardProps {
   ) => {
     onPointerDown: (e: PointerEvent<HTMLButtonElement>) => void;
   };
-  // Maps "row,col" of a just-placed tile to its wave animation delay (ms).
-  waveCells?: Map<string, number>;
+  // "row,col" of each tile placed by the last move, used to draw a halo
+  // around the whole word.
+  waveCells?: Set<string>;
+  // Total score of the move that just placed waveCells, shown as a floating
+  // badge above the halo.
+  moveScore?: number | null;
 }
 
 const BONUS_LABEL: Record<string, string> = {
@@ -26,12 +30,31 @@ const BONUS_LABEL: Record<string, string> = {
   CENTER: "★",
 };
 
-export function Board({ board, pending, preview, dragHandlers, waveCells }: BoardProps) {
+export function Board({ board, pending, preview, dragHandlers, waveCells, moveScore }: BoardProps) {
   const pendingByCell = new Map(pending.map((t) => [`${t.row},${t.col}`, t]));
 
   const previewCells = new Set(
     (preview?.words ?? []).flatMap((word) => word.cells.map(({ row, col }) => `${row},${col}`))
   );
+
+  // Bounding box of the tiles just placed by the last move: since a move
+  // always places its tiles in a single row or column, this rectangle spans
+  // exactly the word that was played, and is used to draw one halo around
+  // all of it instead of one per tile.
+  let wordBounds: { minRow: number; maxRow: number; minCol: number; maxCol: number } | null = null;
+  if (waveCells) {
+    for (const cellKey of waveCells) {
+      const [r, c] = cellKey.split(",").map(Number);
+      if (!wordBounds) {
+        wordBounds = { minRow: r, maxRow: r, minCol: c, maxCol: c };
+      } else {
+        wordBounds.minRow = Math.min(wordBounds.minRow, r);
+        wordBounds.maxRow = Math.max(wordBounds.maxRow, r);
+        wordBounds.minCol = Math.min(wordBounds.minCol, c);
+        wordBounds.maxCol = Math.max(wordBounds.maxCol, c);
+      }
+    }
+  }
 
   // Pick the bottom-right-most highlighted cell as the anchor for the score badge.
   let scoreAnchor: string | null = null;
@@ -82,17 +105,21 @@ export function Board({ board, pending, preview, dragHandlers, waveCells }: Boar
           const letter = pendingTile?.letter ?? cell.letter;
           const isBlank = pendingTile?.isBlank ?? cell.isBlank;
           const showScore = key === scoreAnchor;
-          const waveDelayMs = waveCells?.get(key);
+
+          // Explicit grid placement (rather than relying on auto-flow) so
+          // adding the board__word-glow overlay below, which needs an
+          // explicit position to span multiple cells, doesn't push these
+          // cells sideways to dodge the area it occupies.
+          const gridPosition: CSSProperties = { gridRow: cell.row + 1, gridColumn: cell.col + 1 };
 
           if (letter !== null && letter !== undefined) {
             return (
-              <div key={key} className={`board__cell${waveDelayMs !== undefined ? " board__cell--wave" : ""}`}>
+              <div key={key} className="board__cell" style={gridPosition}>
                 <Tile
                   letter={letter}
                   isBlank={isBlank}
                   faded={!!pendingTile}
                   draggable={!!pendingTile}
-                  waveDelayMs={waveDelayMs}
                   {...(pendingTile ? dragHandlers(cell.row, cell.col, letter, isBlank) : {})}
                 />
                 {showScore && <span className="board__cell__preview-score">{preview!.totalScore}</span>}
@@ -105,6 +132,7 @@ export function Board({ board, pending, preview, dragHandlers, waveCells }: Boar
             <div
               key={key}
               className={`board__cell board__cell--empty${cell.bonus ? ` board__cell--${cell.bonus}` : ""}`}
+              style={gridPosition}
               data-drop-target={`cell:${cell.row}:${cell.col}`}
             >
               {cell.bonus ? BONUS_LABEL[cell.bonus] : ""}
@@ -113,6 +141,17 @@ export function Board({ board, pending, preview, dragHandlers, waveCells }: Boar
             </div>
           );
         })
+      )}
+      {wordBounds && (
+        <div
+          className="board__word-glow"
+          style={{
+            gridRow: `${wordBounds.minRow + 1} / ${wordBounds.maxRow + 2}`,
+            gridColumn: `${wordBounds.minCol + 1} / ${wordBounds.maxCol + 2}`,
+          }}
+        >
+          {moveScore != null && <span className="board__word-glow__score">+{moveScore}</span>}
+        </div>
       )}
     </div>
   );

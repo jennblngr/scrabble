@@ -40,11 +40,15 @@ interface DragVisual {
 // doesn't briefly flash a ghost tile on ordinary taps/clicks.
 const DRAG_THRESHOLD = 6;
 
-// Timing for the "move just validated" animation: each newly placed tile on
-// the board pops up in sequence (a little wave), and the score counter ticks
-// up in sync, finishing right as the last tile settles back down.
+// Timing for the "move just validated" score counter: it ticks up one step
+// per newly placed tile, in sequence, rather than jumping straight to the
+// final total.
 const TILE_STAGGER_MS = 130;
 const TILE_ANIM_MS = 550;
+
+// Duration of the halo/badge animations around the played word and the score
+// pill (see `score-halo`, `score-plus`, `board-word-glow` in styles.css).
+const HALO_MS = 1600;
 
 function waveDuration(tileCount: number) {
   return Math.max(tileCount - 1, 0) * TILE_STAGGER_MS + TILE_ANIM_MS;
@@ -57,9 +61,8 @@ interface ScoreAnim {
   tileCount: number;
 }
 
-// Bumps the displayed score up one step each time a tile hits peak scale
-// (the midpoint of its wave animation, see `.tile--wave` in styles.css),
-// landing on `anim.to` exactly when the last tile peaks.
+// Bumps the displayed score up one step per placed tile, staggered by
+// TILE_STAGGER_MS, landing on `anim.to` once the last step fires.
 function useDisplayedScore(value: number, anim: ScoreAnim | null) {
   const [display, setDisplay] = useState(value);
 
@@ -92,8 +95,8 @@ export function Game({ username, gameId, onBack }: GameProps) {
   const [drag, setDrag] = useState<DragVisual | null>(null);
   const dragPendingRef = useRef<PendingDrag | null>(null);
   const [scoreAnim, setScoreAnim] = useState<ScoreAnim | null>(null);
-  // Maps "row,col" of a just-placed tile to its wave animation delay (ms).
-  const [waveCells, setWaveCells] = useState<Map<string, number>>(new Map());
+  // "row,col" of each tile placed by the last move, used to halo the word on the board.
+  const [waveCells, setWaveCells] = useState<Set<string>>(new Set());
   // Guards against flashing the score box for the lastMove already present in
   // the very first game:state received after (re)joining, which may be stale
   // (e.g. from before a page reload) rather than a move just played now.
@@ -107,7 +110,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
     setPending([]);
     setPreview(null);
     setScoreAnim(null);
-    setWaveCells(new Map());
+    setWaveCells(new Set());
     hasReceivedStateRef.current = false;
     stateRef.current = null;
 
@@ -123,8 +126,8 @@ export function Game({ username, gameId, onBack }: GameProps) {
         const playerId = s.lastMove!.username;
 
         // Diff against the previous board to find the tiles this move just
-        // placed, so only those get the wave animation (not tiles already on
-        // the board from earlier moves).
+        // placed, so only those get haloed (not tiles already on the board
+        // from earlier moves).
         const newCells: { row: number; col: number }[] = [];
         if (prev) {
           for (const line of s.board) {
@@ -142,7 +145,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
         const tileCount = Math.max(newCells.length, 1);
 
         setScoreAnim({ username: playerId, from, to, tileCount });
-        setWaveCells(new Map(newCells.map((c, i) => [`${c.row},${c.col}`, i * TILE_STAGGER_MS])));
+        setWaveCells(new Set(newCells.map((c) => `${c.row},${c.col}`)));
       }
 
       // A state re-sent after a reconnect, where nothing was played, must not
@@ -203,11 +206,13 @@ export function Game({ username, gameId, onBack }: GameProps) {
 
   useEffect(() => {
     if (!scoreAnim) return;
-    // A little buffer after the last tile settles before clearing the animation.
+    // Keep the animation state around at least as long as the halo/badge
+    // animations (HALO_MS) need to finish, even for single-tile moves where
+    // the score count-up itself is shorter.
     const timeout = setTimeout(() => {
       setScoreAnim(null);
-      setWaveCells(new Map());
-    }, waveDuration(scoreAnim.tileCount) + 300);
+      setWaveCells(new Set());
+    }, Math.max(waveDuration(scoreAnim.tileCount) + 300, HALO_MS + 100));
     return () => clearTimeout(timeout);
   }, [scoreAnim]);
 
@@ -517,13 +522,25 @@ export function Game({ username, gameId, onBack }: GameProps) {
       </header>
 
       <div className="scores">
-        <div className={`scores__col${isMyTurn ? " scores__col--active" : ""}`}>
+        <div
+          className={`scores__col${isMyTurn ? " scores__col--active" : ""}${meAnim ? " scores__col--halo" : ""}`}
+        >
           <span className="scores__name">Vous</span>
-          <span className="scores__value">{meDisplayScore}</span>
+          <span className="scores__value-row">
+            <span className="scores__value">{meDisplayScore}</span>
+            {meAnim && <span className="scores__delta">+{meAnim.to - meAnim.from}</span>}
+          </span>
         </div>
-        <div className={`scores__col scores__col--right${!isMyTurn ? " scores__col--active" : ""}`}>
+        <div
+          className={`scores__col scores__col--right${!isMyTurn ? " scores__col--active" : ""}${
+            opponentAnim ? " scores__col--halo" : ""
+          }`}
+        >
           <span className="scores__name">{opponent?.username}</span>
-          <span className="scores__value">{opponentDisplayScore}</span>
+          <span className="scores__value-row">
+            <span className="scores__value">{opponentDisplayScore}</span>
+            {opponentAnim && <span className="scores__delta">+{opponentAnim.to - opponentAnim.from}</span>}
+          </span>
         </div>
       </div>
 
@@ -534,6 +551,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
           preview={preview}
           dragHandlers={boardDragHandlers}
           waveCells={waveCells}
+          moveScore={scoreAnim ? scoreAnim.to - scoreAnim.from : null}
         />
       </div>
 
