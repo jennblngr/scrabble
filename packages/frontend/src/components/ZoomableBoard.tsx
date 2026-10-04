@@ -191,22 +191,29 @@ export function ZoomableBoard({ board, pending, preview, dragHandlers, waveCells
     window.addEventListener("pointercancel", handleWindowUp);
   }
 
-  // Lets a trackpad pinch (delivered as a ctrl-modified wheel event) or
-  // ctrl/cmd+scroll zoom the board on desktop too. Attached as a native,
-  // non-passive listener: React attaches its own `onWheel` prop as passive
-  // (for scroll performance), so `preventDefault()` inside it is silently
-  // ignored by the browser and logs an "Unable to preventDefault inside
-  // passive event listener" warning instead of actually stopping the page
-  // from zooming/scrolling underneath the gesture.
+  // Lets a trackpad drive the board on desktop too. A trackpad pinch (or
+  // ctrl/cmd+scroll) is delivered as a ctrl-modified wheel event and zooms;
+  // a plain two-finger swipe is delivered as an unmodified wheel event (it
+  // never reaches handlePointerDown, which only tracks touch pointers) and
+  // pans. Attached as a native, non-passive listener: React attaches its own
+  // `onWheel` prop as passive (for scroll performance), so `preventDefault()`
+  // inside it is silently ignored by the browser and logs an "Unable to
+  // preventDefault inside passive event listener" warning instead of
+  // actually stopping the page from zooming/scrolling underneath the gesture.
   useEffect(() => {
     const el = viewportRef.current;
     if (!el) return;
 
     function handleWheel(e: WheelEvent) {
-      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const factor = Math.exp(-e.deltaY * 0.01);
+        zoomAt(zoomRef.current * factor, { x: e.clientX, y: e.clientY }, zoomRef.current, panRef.current);
+        return;
+      }
+      if (zoomRef.current <= 1) return;
       e.preventDefault();
-      const factor = Math.exp(-e.deltaY * 0.01);
-      zoomAt(zoomRef.current * factor, { x: e.clientX, y: e.clientY }, zoomRef.current, panRef.current);
+      commit(zoomRef.current, { x: panRef.current.x - e.deltaX, y: panRef.current.y - e.deltaY });
     }
 
     el.addEventListener("wheel", handleWheel, { passive: false });
