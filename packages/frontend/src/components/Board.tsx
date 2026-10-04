@@ -56,45 +56,82 @@ export function Board({ board, pending, preview, dragHandlers, waveCells, moveSc
     }
   }
 
-  // Pick the bottom-right-most highlighted cell as the anchor for the score badge.
-  let scoreAnchor: string | null = null;
+  // Bounding box of the preview, used to center the score badge above it and,
+  // when the preview is a simple straight word, to draw a single dashed
+  // rectangle instead of one outline segment per cell (see
+  // previewIsRectangular below).
+  let previewBounds: { minRow: number; maxRow: number; minCol: number; maxCol: number } | null = null;
   for (const cellKey of previewCells) {
-    if (!scoreAnchor) {
-      scoreAnchor = cellKey;
-      continue;
-    }
     const [r, c] = cellKey.split(",").map(Number);
-    const [ar, ac] = scoreAnchor.split(",").map(Number);
-    if (r + c > ar + ac) scoreAnchor = cellKey;
+    if (!previewBounds) {
+      previewBounds = { minRow: r, maxRow: r, minCol: c, maxCol: c };
+    } else {
+      previewBounds.minRow = Math.min(previewBounds.minRow, r);
+      previewBounds.maxRow = Math.max(previewBounds.maxRow, r);
+      previewBounds.minCol = Math.min(previewBounds.minCol, c);
+      previewBounds.maxCol = Math.max(previewBounds.maxCol, c);
+    }
   }
 
+  // True when the preview is just one straight word (no cross word), i.e.
+  // previewCells fully fills its own bounding box. In that (common) case the
+  // outline is drawn as a single rectangle on the shared overlay below, so
+  // the dash pattern is continuous and stays put when the move is validated.
+  // An irregular shape (a cross word formed alongside the main word) falls
+  // back to the per-cell outline, which hugs the exact shape instead of
+  // boxing in unrelated cells.
+  const previewIsRectangular =
+    !!previewBounds &&
+    previewCells.size ===
+      (previewBounds.maxRow - previewBounds.minRow + 1) * (previewBounds.maxCol - previewBounds.minCol + 1);
+
   function previewOutline(row: number, col: number): CSSProperties | undefined {
+    if (previewIsRectangular) return undefined;
     if (!previewCells.has(`${row},${col}`)) return undefined;
     const top = previewCells.has(`${row - 1},${col}`);
     const bottom = previewCells.has(`${row + 1},${col}`);
     const left = previewCells.has(`${row},${col - 1}`);
     const right = previewCells.has(`${row},${col + 1}`);
-    const edges = [
-      !top && "inset 0 3px 0 0 var(--preview-outline)",
-      !bottom && "inset 0 -3px 0 0 var(--preview-outline)",
-      !left && "inset 3px 0 0 0 var(--preview-outline)",
-      !right && "inset -3px 0 0 0 var(--preview-outline)",
-    ].filter(Boolean);
-    // Rendered as a dedicated overlay (not a box-shadow on the cell itself) so it
+    const dashed = "2px dashed var(--color-accent)";
+    // Rendered as a dedicated overlay (not a border on the cell itself) so it
     // paints above the tile and isn't dimmed by the pending tile's own opacity.
     // On sides that connect to another preview cell, extend the overlay into the
-    // board's 1px cell gap so the border bars on the other axis span the gap
-    // instead of breaking at every grid line. On exposed (bordered) sides,
-    // extend the overlay outward by the border thickness so the inset shadow
-    // lands just outside the cell instead of overlapping the tile inside it.
+    // board's 1px cell gap (and skip the border there) so the dashed line on the
+    // other axis spans the gap instead of breaking at every grid line. On exposed
+    // sides, extend the overlay outward by the border thickness so the dashed
+    // line lands just outside the cell instead of overlapping the tile inside it.
     return {
-      top: top ? -1 : -3,
-      bottom: bottom ? -1 : -3,
-      left: left ? -1 : -3,
-      right: right ? -1 : -3,
-      boxShadow: edges.join(", "),
+      top: top ? -1 : -2,
+      bottom: bottom ? -1 : -2,
+      left: left ? -1 : -2,
+      right: right ? -1 : -2,
+      borderTop: top ? "none" : dashed,
+      borderBottom: bottom ? "none" : dashed,
+      borderLeft: left ? "none" : dashed,
+      borderRight: right ? "none" : dashed,
     };
   }
+
+  // The live preview and the just-played halo are never on screen together
+  // (validating a move clears the preview), so they share a single overlay
+  // element: same geometry, same badge, only the state class differs. That
+  // way the badge doesn't jump between two differently-styled boxes as the
+  // move is validated — it just changes state in place.
+  const overlay = wordBounds
+    ? {
+        bounds: wordBounds,
+        state: "played",
+        boxed: true,
+        label: moveScore != null ? `+${moveScore}` : null,
+      }
+    : previewBounds && preview
+    ? {
+        bounds: previewBounds,
+        state: "preview",
+        boxed: previewIsRectangular,
+        label: `${preview.totalScore}`,
+      }
+    : null;
 
   return (
     <div className="board">
@@ -104,10 +141,9 @@ export function Board({ board, pending, preview, dragHandlers, waveCells, moveSc
           const pendingTile = pendingByCell.get(key);
           const letter = pendingTile?.letter ?? cell.letter;
           const isBlank = pendingTile?.isBlank ?? cell.isBlank;
-          const showScore = key === scoreAnchor;
 
           // Explicit grid placement (rather than relying on auto-flow) so
-          // adding the board__word-glow overlay below, which needs an
+          // adding the board__word-box overlay below, which needs an
           // explicit position to span multiple cells, doesn't push these
           // cells sideways to dodge the area it occupies.
           const gridPosition: CSSProperties = { gridRow: cell.row + 1, gridColumn: cell.col + 1 };
@@ -122,7 +158,6 @@ export function Board({ board, pending, preview, dragHandlers, waveCells, moveSc
                   draggable={!!pendingTile}
                   {...(pendingTile ? dragHandlers(cell.row, cell.col, letter, isBlank) : {})}
                 />
-                {showScore && <span className="board__cell__preview-score">{preview!.totalScore}</span>}
                 <div className="board__cell__outline" style={previewOutline(cell.row, cell.col)} />
               </div>
             );
@@ -136,21 +171,28 @@ export function Board({ board, pending, preview, dragHandlers, waveCells, moveSc
               data-drop-target={`cell:${cell.row}:${cell.col}`}
             >
               {cell.bonus ? BONUS_LABEL[cell.bonus] : ""}
-              {showScore && <span className="board__cell__preview-score">{preview!.totalScore}</span>}
               <div className="board__cell__outline" style={previewOutline(cell.row, cell.col)} />
             </div>
           );
         })
       )}
-      {wordBounds && (
+      {overlay && (
         <div
-          className="board__word-glow"
+          className={`board__word-box board__word-box--${overlay.state}${
+            overlay.boxed ? " board__word-box--boxed" : ""
+          }${
+            // The badge normally floats above the word; .board (and its
+            // board-viewport ancestor) both clip overflow for zoom/pan, so a
+            // word on the very top row would otherwise have its badge
+            // clipped away entirely rather than just overlapping something.
+            overlay.bounds.minRow === 0 ? " board__word-box--flip" : ""
+          }`}
           style={{
-            gridRow: `${wordBounds.minRow + 1} / ${wordBounds.maxRow + 2}`,
-            gridColumn: `${wordBounds.minCol + 1} / ${wordBounds.maxCol + 2}`,
+            gridRow: `${overlay.bounds.minRow + 1} / ${overlay.bounds.maxRow + 2}`,
+            gridColumn: `${overlay.bounds.minCol + 1} / ${overlay.bounds.maxCol + 2}`,
           }}
         >
-          {moveScore != null && <span className="board__word-glow__score">+{moveScore}</span>}
+          {overlay.label && <span className="board__word-box__score">{overlay.label}</span>}
         </div>
       )}
     </div>

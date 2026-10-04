@@ -47,7 +47,7 @@ const TILE_STAGGER_MS = 130;
 const TILE_ANIM_MS = 550;
 
 // Duration of the halo/badge animations around the played word and the score
-// pill (see `score-halo`, `score-plus`, `board-word-glow` in styles.css).
+// pill (see `score-halo`, `score-plus`, `word-box-dismiss` in styles.css).
 const HALO_MS = 1600;
 
 function waveDuration(tileCount: number) {

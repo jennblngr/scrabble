@@ -29,6 +29,13 @@
   --board-mt-bg: #c0392b;
   --board-mt-text: #ffffff;
   --preview-outline: #6fa25c;
+  /* Text color for the word score badge (board__word-box__score): tile-letter
+     color before validation, site background color once validated (red
+     fill). In dark mode this is inverted (see the dark blocks below) because
+     the site's own near-black background is unreadable on the badge's dark
+     surfaces — a light color is used there instead. */
+  --board-overlay-text-before: var(--tile-text);
+  --board-overlay-text-after: var(--color-bg);
 
   font-family: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
@@ -63,6 +70,13 @@
     --board-mt-bg: #c0392b;
     --board-mt-text: #ffffff;
     --preview-outline: #93d17e;
+    /* Inverted from the light-theme mapping: the site's own background here
+       is near-black (--color-bg: #211b14) and unreadable against the badge's
+       dark surfaces (the board's empty-cell color, or the red fill), so a
+       light color is used instead — the light theme's own --color-bg tone
+       (#faf7ef), constant for both states instead of switching per state. */
+    --board-overlay-text-before: #faf7ef;
+    --board-overlay-text-after: #faf7ef;
   }
 }
 
@@ -96,6 +110,8 @@
   --board-mt-bg: #c0392b;
   --board-mt-text: #ffffff;
   --preview-outline: #93d17e;
+  --board-overlay-text-before: #faf7ef;
+  --board-overlay-text-after: #faf7ef;
 }
 
 :root[data-theme="light"] {
@@ -534,19 +550,92 @@ body {
   pointer-events: none;
 }
 
-.board__cell__preview-score {
-  position: absolute;
-  top: 100%;
-  right: -3px;
-  margin-top: 3px;
-  background: var(--preview-outline);
-  color: white;
-  font-size: 0.5rem;
-  font-weight: 700;
-  line-height: 1;
-  padding: 1px 3px;
+/* One overlay spanning the word's bounding box (grid-placed in Board.tsx),
+   shared by the live preview and the just-played halo. Both states use the
+   same box and the same badge, so validating a move only swaps styles in
+   place instead of replacing one element with a differently-styled one. */
+.board__word-box {
+  position: relative;
   z-index: 4;
   pointer-events: none;
+}
+
+/* The outline around the word. Always drawn once played; for a preview only
+   when the word is a plain rectangle (previewIsRectangular in Board.tsx) —
+   an irregular shape falls back to the per-cell board__cell__outline. */
+.board__word-box--boxed::before,
+.board__word-box--boxed::after {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: 2px;
+}
+
+.board__word-box--boxed::before {
+  border: 2px dashed var(--color-accent);
+}
+
+.board__word-box--boxed::after {
+  border: 2px solid var(--color-accent);
+  background: var(--color-accent-soft-bg);
+  opacity: 0;
+}
+
+/* Score badge, centered above the word in both states. The dashed outline and
+   the filled background are two stacked layers behind the text rather than
+   the badge's own border/background, so switching between them is a
+   cross-fade instead of a discrete border-style flip. */
+.board__word-box__score {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  /* Not the red accent: tested too low-contrast on dark badge surfaces. Also
+     not a single flat neutral — see --board-overlay-text-before in
+     styles.css for the full before/after/per-theme mapping; this is the
+     "before validation" value, overridden by --played below. */
+  color: var(--board-overlay-text-before);
+  /* Opaque base behind the translucent dashed/filled layers below, so the
+     badge stays legible over the board regardless of what's directly behind
+     it (an empty cell, a tile, a bonus square, ...). Matches the board's own
+     empty-cell color so the badge reads as part of the board. */
+  background: var(--board-cell-empty-bg);
+  border-radius: 6px;
+}
+
+/* For a word on the board's very top row, .board clips overflow (needed for
+   zoom/pan), so a badge floating above it would be invisible instead of just
+   overlapping something — flip it below the word instead. */
+.board__word-box--flip .board__word-box__score {
+  bottom: auto;
+  top: 100%;
+  margin-bottom: 0;
+  margin-top: 6px;
+}
+
+.board__word-box__score::before,
+.board__word-box__score::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  z-index: -1;
+}
+
+.board__word-box__score::before {
+  border: 2px dashed var(--color-accent);
+  /* No background here: the badge's own --board-cell-empty-bg (set above)
+     should show through as-is, not tinted by a translucent accent wash. */
+}
+
+.board__word-box__score::after {
+  background: var(--color-accent);
+  opacity: 0;
 }
 
 .board__cell--empty {
@@ -640,43 +729,77 @@ body {
   text-decoration: underline;
 }
 
-/* A single overlay spanning every cell of the word just played (see the
-   `wordBounds` grid placement in Board.tsx), rather than one halo per tile. */
-.board__word-glow {
-  position: relative;
-  z-index: 4;
-  pointer-events: none;
-  animation: board-word-glow 1.6s ease;
+/* Validated state: the dashed layers cross-fade into the filled ones, so the
+   outline and the badge read as the preview filling in rather than as a new
+   element appearing. The badge then floats up and out, and the outline fades
+   with it. */
+.board__word-box--played {
+  animation: word-box-dismiss 1.6s ease forwards;
 }
 
-.board__word-glow__score {
-  position: absolute;
-  bottom: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  margin-bottom: 4px;
-  background: var(--color-accent);
-  color: var(--color-accent-contrast);
-  font-size: 0.65rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 4px;
-  white-space: nowrap;
-  animation: board-float 1.6s ease forwards;
+.board__word-box--played.board__word-box--boxed::before,
+.board__word-box--played .board__word-box__score::before {
+  animation: word-box-fade-out 1.6s ease forwards;
 }
 
-@keyframes board-word-glow {
-  0% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 1); }
-  15% { box-shadow: 0 0 0 3px rgba(192, 57, 43, 1); }
-  78% { box-shadow: 0 0 0 3px rgba(192, 57, 43, 1); }
-  100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 1); }
+.board__word-box--played.board__word-box--boxed::after,
+.board__word-box--played .board__word-box__score::after {
+  animation: word-box-fade-in 1.6s ease forwards;
 }
 
-@keyframes board-float {
-  0% { opacity: 0; transform: translate(-50%, 6px); }
-  15% { opacity: 1; transform: translate(-50%, 0); }
+.board__word-box--played .board__word-box__score {
+  /* Cross-fades --board-overlay-text-before to --board-overlay-text-after in
+     sync with the background (see word-box-fade-in/-out above), so the text
+     stays legible as the badge goes from dashed to filled. In dark mode
+     both tokens are the same value, so this is a no-op there. */
+  animation: word-box-float-out 1.6s ease forwards, word-box-score-text 1.6s ease forwards;
+}
+
+/* Flipped badge (top-row word) sits below the word, so it should drift
+   further down and away as it fades, not up into the word. */
+.board__word-box--played.board__word-box--flip .board__word-box__score {
+  animation: word-box-float-out-flip 1.6s ease forwards, word-box-score-text 1.6s ease forwards;
+}
+
+/* The dashed look fades out right as the filled one fades in, so the two read
+   as a single cross-fade. Shared by the outline and the badge. */
+@keyframes word-box-fade-out {
+  0% { opacity: 1; }
+  15% { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+@keyframes word-box-fade-in {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  100% { opacity: 1; }
+}
+
+@keyframes word-box-score-text {
+  0% { color: var(--board-overlay-text-before); }
+  15% { color: var(--board-overlay-text-after); }
+  100% { color: var(--board-overlay-text-after); }
+}
+
+/* Starts where the preview badge already sits (no re-entry) and leaves by
+   drifting up as it fades. */
+@keyframes word-box-float-out {
+  0% { opacity: 1; transform: translate(-50%, 0); }
   78% { opacity: 1; transform: translate(-50%, -2px); }
   100% { opacity: 0; transform: translate(-50%, -10px); }
+}
+
+/* Same, mirrored: the flipped badge sits below the word, so it drifts down. */
+@keyframes word-box-float-out-flip {
+  0% { opacity: 1; transform: translate(-50%, 0); }
+  78% { opacity: 1; transform: translate(-50%, 2px); }
+  100% { opacity: 0; transform: translate(-50%, 10px); }
+}
+
+@keyframes word-box-dismiss {
+  0% { opacity: 1; }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 .toast {
