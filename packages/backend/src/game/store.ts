@@ -65,7 +65,7 @@ export async function loadGame(id: string): Promise<InternalGame> {
   })) as InternalGame["players"];
 
   const { rows: lastMoveRows } = await pool.query(
-    `SELECT username, words, score FROM moves WHERE game_id = $1 AND kind = 'place' ORDER BY created_at DESC LIMIT 1`,
+    `SELECT username, words, score, tiles FROM moves WHERE game_id = $1 AND kind = 'place' ORDER BY created_at DESC LIMIT 1`,
     [id]
   );
   const lastMoveRow = lastMoveRows[0];
@@ -83,6 +83,10 @@ export async function loadGame(id: string): Promise<InternalGame> {
           username: lastMoveRow.username,
           words: (lastMoveRow.words as { word: string }[]).map((w) => w.word),
           score: lastMoveRow.score,
+          cells: (lastMoveRow.tiles as { row: number; col: number }[]).map((t) => ({
+            row: t.row,
+            col: t.col,
+          })),
         }
       : null,
     isFirstMove: row.board.every((line: unknown[]) =>

@@ -40,6 +40,9 @@ export interface LastMove {
   username: string;
   words: string[];
   score: number;
+  // Board cells this move placed a letter on, so a client that only sees
+  // this move on load (not live) can still mark exactly those tiles.
+  cells: { row: number; col: number }[];
 }
 
 export interface GameState {

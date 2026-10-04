@@ -20,6 +20,9 @@ interface BoardProps {
   // Total score of the move that just placed waveCells, shown as a floating
   // badge above the halo.
   moveScore?: number | null;
+  // "row,col" of opponent tiles played while this player was away, shown
+  // with a small dot instead of the halo above.
+  unseenOpponentCells?: Set<string>;
 }
 
 const BONUS_LABEL: Record<string, string> = {
@@ -30,7 +33,15 @@ const BONUS_LABEL: Record<string, string> = {
   CENTER: "★",
 };
 
-export function Board({ board, pending, preview, dragHandlers, waveCells, moveScore }: BoardProps) {
+export function Board({
+  board,
+  pending,
+  preview,
+  dragHandlers,
+  waveCells,
+  moveScore,
+  unseenOpponentCells,
+}: BoardProps) {
   const pendingByCell = new Map(pending.map((t) => [`${t.row},${t.col}`, t]));
 
   const previewCells = new Set(
@@ -156,6 +167,7 @@ export function Board({ board, pending, preview, dragHandlers, waveCells, moveSc
                   isBlank={isBlank}
                   faded={!!pendingTile}
                   draggable={!!pendingTile}
+                  unseen={!pendingTile && !!unseenOpponentCells?.has(key)}
                   {...(pendingTile ? dragHandlers(cell.row, cell.col, letter, isBlank) : {})}
                 />
                 <div className="board__cell__outline" style={previewOutline(cell.row, cell.col)} />

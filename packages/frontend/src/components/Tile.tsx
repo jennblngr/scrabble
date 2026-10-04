@@ -7,6 +7,8 @@ interface TileProps {
   selected?: boolean;
   faded?: boolean;
   draggable?: boolean;
+  // Played by the opponent while this player was away from the game.
+  unseen?: boolean;
   onClick?: () => void;
   onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void;
   onPointerMove?: (e: PointerEvent<HTMLButtonElement>) => void;
@@ -20,6 +22,7 @@ export function Tile({
   selected,
   faded,
   draggable,
+  unseen,
   onClick,
   onPointerDown,
   onPointerMove,
@@ -43,6 +46,7 @@ export function Tile({
     >
       <span className="tile__letter">{letter}</span>
       {!isBlank && <span className="tile__value">{value}</span>}
+      {unseen && <span className="tile__unseen-dot" aria-hidden="true" />}
     </button>
   );
 }

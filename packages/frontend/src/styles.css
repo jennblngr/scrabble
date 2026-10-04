@@ -729,6 +729,18 @@ body {
   text-decoration: underline;
 }
 
+/* Marks a tile played by the opponent while this player was away (see
+   unseenOpponentCells in Game.tsx). */
+.tile__unseen-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+}
+
 /* Validated state: the dashed layers cross-fade into the filled ones, so the
    outline and the badge read as the preview filling in rather than as a new
    element appearing. The badge then floats up and out, and the outline fades

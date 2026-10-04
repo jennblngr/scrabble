@@ -134,7 +134,12 @@ export function applyPlace(game: InternalGame, username: string, placed: PlacedT
 
   game.isFirstMove = false;
   game.consecutivePasses = 0;
-  game.lastMove = { username: player.username, words: result.words.map((w) => w.word), score: result.totalScore };
+  game.lastMove = {
+    username: player.username,
+    words: result.words.map((w) => w.word),
+    score: result.totalScore,
+    cells: placed.map((t) => ({ row: t.row, col: t.col })),
+  };
 
   if (game.bag.length === 0 && player.rack.length === 0) {
     finishGameEarly(game, player.username);

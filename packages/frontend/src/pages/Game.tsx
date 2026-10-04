@@ -97,6 +97,11 @@ export function Game({ username, gameId, onBack }: GameProps) {
   const [scoreAnim, setScoreAnim] = useState<ScoreAnim | null>(null);
   // "row,col" of each tile placed by the last move, used to halo the word on the board.
   const [waveCells, setWaveCells] = useState<Set<string>>(new Set());
+  // "row,col" of the opponent's last move, shown as a small red dot instead of
+  // the halo when that move is discovered on the very first game:state after
+  // (re)opening the game (i.e. it was played while this player was away), as
+  // opposed to a move seen live, which already gets the halo above.
+  const [unseenOpponentCells, setUnseenOpponentCells] = useState<Set<string>>(new Set());
   // Guards against flashing the score box for the lastMove already present in
   // the very first game:state received after (re)joining, which may be stale
   // (e.g. from before a page reload) rather than a move just played now.
@@ -111,6 +116,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
     setPreview(null);
     setScoreAnim(null);
     setWaveCells(new Set());
+    setUnseenOpponentCells(new Set());
     hasReceivedStateRef.current = false;
     stateRef.current = null;
 
@@ -146,6 +152,17 @@ export function Game({ username, gameId, onBack }: GameProps) {
 
         setScoreAnim({ username: playerId, from, to, tileCount });
         setWaveCells(new Set(newCells.map((c) => `${c.row},${c.col}`)));
+        // This move (live or not) supersedes whatever the "while you were
+        // away" marker below was pointing at.
+        setUnseenOpponentCells(new Set());
+      }
+
+      // The very first game:state after (re)opening the game: if the last
+      // move on the board belongs to the opponent, it was necessarily played
+      // while this player was away (a move played live gets the halo above
+      // instead), so mark it with a dot rather than the halo/score animation.
+      if (!hasReceivedStateRef.current && s.lastMove && s.lastMove.username !== username) {
+        setUnseenOpponentCells(new Set(s.lastMove.cells.map((c) => `${c.row},${c.col}`)));
       }
 
       // A state re-sent after a reconnect, where nothing was played, must not
@@ -189,6 +206,9 @@ export function Game({ username, gameId, onBack }: GameProps) {
       return;
     }
     getSocket().emit("game:preview", { gameId, tiles: pending });
+    // The player has started acting on the board, so the "while you were
+    // away" dot has served its purpose.
+    setUnseenOpponentCells(new Set());
   }, [pending, gameId]);
 
   const [errorFading, setErrorFading] = useState(false);
@@ -552,6 +572,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
           dragHandlers={boardDragHandlers}
           waveCells={waveCells}
           moveScore={scoreAnim ? scoreAnim.to - scoreAnim.from : null}
+          unseenOpponentCells={unseenOpponentCells}
         />
       </div>
 
