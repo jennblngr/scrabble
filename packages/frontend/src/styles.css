@@ -481,11 +481,38 @@ body {
 }
 
 .game__bag {
-  font-size: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
   color: var(--color-text-muted);
-  text-align: center;
   margin: 0;
   flex-shrink: 0;
+}
+
+.game__bag-count {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.game__bag-icon {
+  flex-shrink: 0;
+}
+
+.game__bag-label {
+  font-size: 0.7rem;
+}
+
+/* Confirms a tile exchange landed, alongside the rack tiles' own
+   tile-exchange-out animation below (see submitExchange in Game.tsx): just
+   the count, not the icon, flashes to the accent color and back. */
+.game__bag-count--blink {
+  animation: bag-count-flash 0.8s ease;
+}
+
+@keyframes bag-count-flash {
+  0%, 100% { color: var(--color-text-muted); }
+  50% { color: var(--color-accent); }
 }
 
 .board-viewport {
@@ -727,6 +754,32 @@ body {
 
 .tile--blank {
   text-decoration: underline;
+}
+
+/* A tile just sent off in an exchange: shrinks and fades in place (no
+   translation) rather than being yanked out the instant the server's new
+   rack arrives (see exchangingTiles in Game.tsx). */
+.tile--exchanging {
+  animation: tile-exchange-out 0.45s ease forwards;
+  pointer-events: none;
+}
+
+@keyframes tile-exchange-out {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.3); }
+}
+
+/* The replacement tile that swaps into the slot right as tile-exchange-out
+   above finishes: grows/fades in instead of popping in instantly, so the
+   whole exchange reads as one continuous gesture (see appearingTileIds in
+   Game.tsx). */
+.tile--appearing {
+  animation: tile-exchange-in 0.35s ease;
+}
+
+@keyframes tile-exchange-in {
+  0% { opacity: 0; transform: scale(0.3); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 /* Marks a tile played by the opponent while this player was away (see

@@ -50,6 +50,14 @@ const TILE_ANIM_MS = 550;
 // pill (see `score-halo`, `score-plus`, `word-box-dismiss` in styles.css).
 const HALO_MS = 1600;
 
+// Duration of the exchanged tiles' shrink-and-fade (see `tile--exchanging` in
+// styles.css) and of the bag count's confirmation flash (`game__bag-count--blink`).
+const EXCHANGE_TILE_ANIM_MS = 450;
+const BAG_BLINK_MS = 800;
+// Duration of a replacement tile's grow-and-fade-in once it takes over the
+// slot its predecessor just vacated (see `tile--appearing` in styles.css).
+const EXCHANGE_APPEAR_MS = 350;
+
 function waveDuration(tileCount: number) {
   return Math.max(tileCount - 1, 0) * TILE_STAGGER_MS + TILE_ANIM_MS;
 }
@@ -102,6 +110,21 @@ export function Game({ username, gameId, onBack }: GameProps) {
   // (re)opening the game (i.e. it was played while this player was away), as
   // opposed to a move seen live, which already gets the halo above.
   const [unseenOpponentCells, setUnseenOpponentCells] = useState<Set<string>>(new Set());
+  // Rack tiles mid-exchange: kept around (with their pre-exchange letter) so
+  // they can shrink and fade out in their own slot instead of instantly
+  // vanishing once the server's reply drops them from the rack.
+  const [exchangingTiles, setExchangingTiles] = useState<Map<string, RackTile>>(new Map());
+  const [bagBlink, setBagBlink] = useState(false);
+  // oldTileId -> newTileId, filled in as the server's replacement tiles
+  // arrive while the old ones are still mid-animation. Applied to rackOrder
+  // only once the old tile's animation finishes (see the exchangingTiles
+  // cleanup effect below), so the new tile pops into the exact slot its
+  // predecessor shrank out of instead of appearing elsewhere first.
+  const replacementMapRef = useRef<Map<string, string>>(new Map());
+  // Replacement tiles that just swapped into a vacated slot: grown/faded in
+  // for a moment so their entrance reads as gradual too, instead of popping
+  // in instantly right as the old tile's own fade finishes.
+  const [appearingTileIds, setAppearingTileIds] = useState<Set<string>>(new Set());
   // Guards against flashing the score box for the lastMove already present in
   // the very first game:state received after (re)joining, which may be stale
   // (e.g. from before a page reload) rather than a move just played now.
@@ -236,6 +259,35 @@ export function Game({ username, gameId, onBack }: GameProps) {
     return () => clearTimeout(timeout);
   }, [scoreAnim]);
 
+  useEffect(() => {
+    if (exchangingTiles.size === 0) return;
+    const timeout = setTimeout(() => {
+      // Swap each old id for its replacement (if the server had already
+      // replied by now) in the same rackOrder slot, so the new tile takes
+      // over exactly where the old one just finished shrinking away.
+      const replacements = replacementMapRef.current;
+      if (replacements.size > 0) {
+        setRackOrder((prev) => prev.map((id) => replacements.get(id) ?? id));
+        setAppearingTileIds(new Set(replacements.values()));
+        replacementMapRef.current = new Map();
+      }
+      setExchangingTiles(new Map());
+    }, EXCHANGE_TILE_ANIM_MS);
+    return () => clearTimeout(timeout);
+  }, [exchangingTiles]);
+
+  useEffect(() => {
+    if (appearingTileIds.size === 0) return;
+    const timeout = setTimeout(() => setAppearingTileIds(new Set()), EXCHANGE_APPEAR_MS);
+    return () => clearTimeout(timeout);
+  }, [appearingTileIds]);
+
+  useEffect(() => {
+    if (!bagBlink) return;
+    const timeout = setTimeout(() => setBagBlink(false), BAG_BLINK_MS);
+    return () => clearTimeout(timeout);
+  }, [bagBlink]);
+
   const me = useMemo(() => state?.players.find((p) => p.username === username) ?? null, [state, username]);
   const opponent = useMemo(() => state?.players.find((p) => p.username !== username) ?? null, [state, username]);
   const isMyTurn = state?.currentPlayerId === username;
@@ -262,11 +314,29 @@ export function Game({ username, gameId, onBack }: GameProps) {
     if (!me) return;
     setRackOrder((prev) => {
       const known = new Set(me.rack.map((t) => t.id));
-      const kept = prev.filter((id) => known.has(id));
-      const newIds = me.rack.map((t) => t.id).filter((id) => !kept.includes(id));
-      return [...kept, ...newIds];
+      // A tile mid-exchange keeps its slot even though the server has
+      // already dropped it from the rack, so it can shrink/fade in place
+      // instead of being yanked out the instant the new state arrives.
+      const kept = prev.filter((id) => known.has(id) || exchangingTiles.has(id));
+
+      // Ids the server just drew that aren't accounted for yet, excluding
+      // ones already queued as a replacement for a still-animating tile.
+      const alreadyQueued = new Set(replacementMapRef.current.values());
+      const freshIds = me.rack.map((t) => t.id).filter((id) => !kept.includes(id) && !alreadyQueued.has(id));
+
+      // Pair fresh ids with tiles still mid-exchange so each new tile pops
+      // into the exact slot its predecessor shrank out of (applied once that
+      // animation finishes, see the exchangingTiles cleanup effect above)
+      // instead of appearing elsewhere while the old one is still fading.
+      const awaitingReplacement = [...exchangingTiles.keys()].filter((id) => !replacementMapRef.current.has(id));
+      const pairedCount = Math.min(awaitingReplacement.length, freshIds.length);
+      for (let i = 0; i < pairedCount; i++) {
+        replacementMapRef.current.set(awaitingReplacement[i], freshIds[i]);
+      }
+
+      return [...kept, ...freshIds.slice(pairedCount)];
     });
-  }, [me]);
+  }, [me, exchangingTiles]);
 
   // Each id keeps the rack slot it was drawn into: a tile placed on the
   // board (pending) becomes an empty slot rather than being removed, so the
@@ -276,10 +346,10 @@ export function Game({ username, gameId, onBack }: GameProps) {
     const usedIds = new Set(pending.map((t) => t.rackTileId));
     const byId = new Map(me.rack.map((t) => [t.id, t]));
     return rackOrder
-      .map((id) => byId.get(id))
+      .map((id) => byId.get(id) ?? exchangingTiles.get(id))
       .filter((t): t is RackTile => !!t)
       .map((t) => ({ id: t.id, tile: usedIds.has(t.id) ? null : t }));
-  }, [me, pending, rackOrder]);
+  }, [me, pending, rackOrder, exchangingTiles]);
 
   const availableRackCount = useMemo(
     () => visibleRack.filter((slot) => slot.tile !== null).length,
@@ -500,9 +570,12 @@ export function Game({ username, gameId, onBack }: GameProps) {
   }
 
   function submitExchange() {
-    if (!gameId || exchangeSelection.size === 0) return;
+    if (!gameId || exchangeSelection.size === 0 || !me) return;
     setError(null);
+    const snapshot = new Map(me.rack.filter((t) => exchangeSelection.has(t.id)).map((t) => [t.id, t]));
     getSocket().emit("game:exchange", { gameId, rackTileIds: [...exchangeSelection] });
+    setExchangingTiles(snapshot);
+    setBagBlink(true);
     setExchangeSelection(new Set());
     setMode("place");
   }
@@ -576,7 +649,32 @@ export function Game({ username, gameId, onBack }: GameProps) {
         />
       </div>
 
-      <p className="game__bag">Tuiles restantes dans le sac : {state.bagCount}</p>
+      <div className="game__bag" aria-label={`Tuiles restantes dans le sac : ${state.bagCount}`}>
+        <span
+          className={`game__bag-count${bagBlink ? " game__bag-count--blink" : ""}`}
+          aria-hidden="true"
+        >
+          {state.bagCount}
+        </span>
+        <svg
+          className="game__bag-icon"
+          aria-hidden="true"
+          width="28"
+          height="28"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M8.5 9 L9.5 4 L14.5 4 L15.5 9" />
+          <path d="M5 9 L19 9 L17 20 L7 20 Z" />
+        </svg>
+        <span className="game__bag-label" aria-hidden="true">
+          Sac
+        </span>
+      </div>
 
       <Rack
         tiles={visibleRack}
@@ -585,6 +683,8 @@ export function Game({ username, gameId, onBack }: GameProps) {
         onSelect={handleSelectTile}
         dragHandlers={rackDragHandlers}
         draggedTileId={drag?.rackTileId}
+        exchangingIds={exchangingTiles.size > 0 ? new Set(exchangingTiles.keys()) : undefined}
+        appearingIds={appearingTileIds.size > 0 ? appearingTileIds : undefined}
       />
 
       {drag && (

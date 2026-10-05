@@ -9,6 +9,10 @@ interface TileProps {
   draggable?: boolean;
   // Played by the opponent while this player was away from the game.
   unseen?: boolean;
+  // Just sent off in a tile exchange: shrinks and fades out in place.
+  exchanging?: boolean;
+  // Just swapped into a slot an exchanged tile vacated: grows and fades in.
+  appearing?: boolean;
   onClick?: () => void;
   onPointerDown?: (e: PointerEvent<HTMLButtonElement>) => void;
   onPointerMove?: (e: PointerEvent<HTMLButtonElement>) => void;
@@ -23,6 +27,8 @@ export function Tile({
   faded,
   draggable,
   unseen,
+  exchanging,
+  appearing,
   onClick,
   onPointerDown,
   onPointerMove,
@@ -36,7 +42,9 @@ export function Tile({
       tabIndex={-1}
       className={`tile${selected ? " tile--selected" : ""}${faded ? " tile--faded" : ""}${
         isBlank ? " tile--blank" : ""
-      }${draggable ? " tile--draggable" : ""}`}
+      }${draggable ? " tile--draggable" : ""}${exchanging ? " tile--exchanging" : ""}${
+        appearing ? " tile--appearing" : ""
+      }`}
       onClick={onClick}
       aria-disabled={!onClick && !draggable}
       onPointerDown={onPointerDown}

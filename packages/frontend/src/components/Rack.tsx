@@ -25,27 +25,46 @@ interface RackProps {
   // empty placeholder instead of the letter, which is already shown by the
   // drag ghost following the pointer.
   draggedTileId?: string;
+  // Ids of tiles just sent off for exchange: shown shrinking/fading out in
+  // place rather than interactive.
+  exchangingIds?: Set<string>;
+  // Ids of replacement tiles that just swapped into a vacated slot: shown
+  // growing/fading in instead of popping in instantly.
+  appearingIds?: Set<string>;
 }
 
-export function Rack({ tiles, exchangeSelection, mode, onSelect, dragHandlers, draggedTileId }: RackProps) {
+export function Rack({
+  tiles,
+  exchangeSelection,
+  mode,
+  onSelect,
+  dragHandlers,
+  draggedTileId,
+  exchangingIds,
+  appearingIds,
+}: RackProps) {
   return (
     <div className="rack" data-drop-target="rack">
-      {tiles.map(({ id, tile: t }) =>
-        t && t.id !== draggedTileId ? (
+      {tiles.map(({ id, tile: t }) => {
+        const exchanging = !!t && !!exchangingIds?.has(t.id);
+        const appearing = !!t && !!appearingIds?.has(t.id);
+        return t && t.id !== draggedTileId ? (
           <div key={id} className="rack__slot" data-drop-target={`rack-tile:${t.id}`}>
             <Tile
               letter={t.letter}
               isBlank={t.letter === ""}
               selected={mode === "exchange" ? exchangeSelection.has(t.id) : false}
-              draggable={mode === "place"}
-              onClick={mode === "exchange" ? () => onSelect(t.id) : undefined}
-              {...(mode === "place" ? dragHandlers(t.id, t.letter, t.letter === "") : {})}
+              draggable={mode === "place" && !exchanging}
+              exchanging={exchanging}
+              appearing={appearing}
+              onClick={mode === "exchange" && !exchanging ? () => onSelect(t.id) : undefined}
+              {...(mode === "place" && !exchanging ? dragHandlers(t.id, t.letter, t.letter === "") : {})}
             />
           </div>
         ) : (
           <div key={id} className="rack__slot rack__slot--empty" data-drop-target={`rack-tile:${id}`} />
-        )
-      )}
+        );
+      })}
     </div>
   );
 }
