@@ -19,4 +19,5 @@ COPY --from=build /app/packages/backend/dist packages/backend/dist
 COPY --from=build /app/packages/backend/data packages/backend/data
 WORKDIR /app/packages/backend
 EXPOSE 4000
+USER node
 CMD ["node", "dist/index.js"]

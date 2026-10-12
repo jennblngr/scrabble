@@ -45,14 +45,11 @@ jobs:
           chmod 600 ~/.ssh/id_deploy
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
 
-      # .env and packages/frontend/dist are gitignored, so the reset keeps them.
+      # The key is restricted on the VPS to the deploy script: no command to pass.
       - name: Run deploy script on the VPS
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_PORT: ${{ secrets.VPS_PORT || '22' }}
-          APP_DIR: ${{ vars.VPS_APP_DIR || '/var/www/scrabble' }}
         run: |
-          ssh -i ~/.ssh/id_deploy -p "$VPS_PORT" -o StrictHostKeyChecking=yes \
-            "$VPS_USER@$VPS_HOST" \
-            "set -e; cd '$APP_DIR' && git fetch --prune origin && git reset --hard '$GITHUB_SHA' && ./scripts/deploy.sh"
+          ssh -i ~/.ssh/id_deploy -p "$VPS_PORT" -o StrictHostKeyChecking=yes "$VPS_USER@$VPS_HOST"
