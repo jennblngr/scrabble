@@ -1,10 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import bcrypt from "bcrypt";
 import cookie from "@fastify/cookie";
-import { config } from "../config.js";
+import { config, knownPlayers } from "../config.js";
 
 const SESSION_COOKIE = "scrabble_session";
-const knownPlayers = [config.players.player1, config.players.player2];
 
 export async function registerAuth(app: FastifyInstance) {
   await app.register(cookie, {
@@ -26,7 +25,7 @@ export async function registerAuth(app: FastifyInstance) {
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       signed: true,
-      maxAge: 60 * 60 * 24 * 30, // 30 days — this is a 2-player private app, long sessions are fine
+      maxAge: 60 * 60 * 24 * 30, // 30 days — this is a small private app, long sessions are fine
     });
     return { username };
   });

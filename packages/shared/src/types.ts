@@ -50,7 +50,8 @@ export interface GameState {
   status: GameStatus;
   board: Board;
   bagCount: number;
-  players: [Player, Player];
+  /** 2 or 3 players, in turn order. */
+  players: Player[];
   currentPlayerId: string;
   consecutivePasses: number;
   lastMove: LastMove | null;
@@ -67,7 +68,8 @@ export interface PlayerSummary {
 export interface GameSummary {
   id: string;
   status: GameStatus;
-  players: [PlayerSummary, PlayerSummary];
+  /** 2 or 3 players, in turn order. */
+  players: PlayerSummary[];
   currentPlayerId: string;
   createdAt: string;
   updatedAt: string;

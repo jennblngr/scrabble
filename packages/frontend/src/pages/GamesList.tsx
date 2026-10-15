@@ -1,11 +1,29 @@
 import { useEffect, useState } from "react";
 import type { GameSummary } from "@scrabble/shared";
 import { listGames, createGame, remindOpponent, deleteGame } from "../api/games";
-import { logout } from "../api/auth";
+import { logout, players as fetchPlayers } from "../api/auth";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { Toast, type ToastState } from "../components/Toast";
+import { isThirdSeat } from "../players";
 
 const REMINDER_DELAY_MS = 24 * 60 * 60 * 1000;
+const MAX_PLAYERS = 3;
+
+// Every way to pick 1 to MAX_PLAYERS - 1 opponents among `others`, smallest
+// games first (e.g. [Bob], [Estelle], [Bob, Estelle]).
+function opponentChoices(others: string[]): string[][] {
+  const choices: string[][] = [[]];
+  for (const other of others) {
+    for (const choice of [...choices]) choices.push([...choice, other]);
+  }
+  return choices
+    .filter((c) => c.length >= 1 && c.length <= MAX_PLAYERS - 1)
+    .sort((a, b) => a.length - b.length);
+}
+
+function joinNames(names: string[]): string {
+  return names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`;
+}
 
 interface GamesListProps {
   username: string;
@@ -18,6 +36,8 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
+  const [otherPlayers, setOtherPlayers] = useState<string[]>([]);
+  const [choosing, setChoosing] = useState(false);
 
   function refresh() {
     listGames()
@@ -26,6 +46,16 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
   }
 
   useEffect(refresh, []);
+
+  useEffect(() => {
+    fetchPlayers()
+      .then(({ usernames }) => setOtherPlayers(usernames.filter((u) => u !== username)))
+      .catch(() => {
+        /* without the list, creating a game falls back to the default pairing */
+      });
+  }, [username]);
+
+  const choices = opponentChoices(otherPlayers);
 
   // Reprendre l'app depuis l'arrière-plan (PWA remise au premier plan, onglet
   // réactivé, retour depuis le cache de navigation) ne remonte pas ce
@@ -43,11 +73,20 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
     };
   }, []);
 
-  async function handleCreate() {
+  function handleNewGameClick() {
+    // A single possible opponent: nothing to choose, start right away.
+    if (choices.length <= 1) {
+      handleCreate(choices[0]);
+    } else {
+      setChoosing((v) => !v);
+    }
+  }
+
+  async function handleCreate(opponents?: string[]) {
     setError(null);
     setCreating(true);
     try {
-      const { gameId } = await createGame();
+      const { gameId } = await createGame(opponents);
       onOpenGame(gameId);
     } catch (err) {
       setError((err as Error).message);
@@ -96,9 +135,33 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
 
       {error && <p className="game__error">{error}</p>}
 
-      <button type="button" className="games-list__new" onClick={handleCreate} disabled={creating}>
-        {creating ? "Création..." : "+ Nouvelle partie"}
+      <button
+        type="button"
+        className="games-list__new"
+        onClick={handleNewGameClick}
+        disabled={creating}
+        aria-expanded={choices.length > 1 ? choosing : undefined}
+      >
+        {creating ? "Création..." : choosing ? "Annuler" : "+ Nouvelle partie"}
       </button>
+
+      {choosing && (
+        <ul className="games-list__choices">
+          {choices.map((opponents) => (
+            <li key={opponents.join("|")}>
+              <button
+                type="button"
+                className="games-list__choice"
+                onClick={() => handleCreate(opponents)}
+                disabled={creating}
+              >
+                <span>Avec {joinNames(opponents)}</span>
+                <span className="games-list__choice-count">{opponents.length + 1} joueurs</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {games === null ? (
         <p className="games-list__empty">Chargement...</p>
@@ -192,14 +255,18 @@ function GameRow({
   const [remindHidden, setRemindHidden] = useState(false);
 
   const me = game.players.find((p) => p.username === username);
-  const opponent = game.players.find((p) => p.username !== username);
+  const opponents = game.players.filter((p) => p.username !== username);
   const isMyTurn = game.status !== "finished" && game.currentPlayerId === username;
+  // Me first, then the others in turn order.
+  const scoreRow = me ? [me, ...opponents] : opponents;
 
+  const myScore = me?.score ?? 0;
+  const bestOpponentScore = Math.max(...opponents.map((p) => p.score));
   const status =
     game.status === "finished"
-      ? (me?.score ?? 0) === (opponent?.score ?? 0)
+      ? myScore === bestOpponentScore
         ? "Égalité"
-        : (me?.score ?? 0) > (opponent?.score ?? 0)
+        : myScore > bestOpponentScore
           ? "Gagnée"
           : "Perdue"
       : null;
@@ -219,9 +286,9 @@ function GameRow({
     try {
       await remindOpponent(game.id);
       setRemindHidden(true);
-      onRemind({ message: `Rappel envoyé avec succès à ${opponent?.username ?? "l'adversaire"} !`, variant: "success" });
+      onRemind({ message: `Rappel envoyé avec succès à ${game.currentPlayerId} !`, variant: "success" });
     } catch {
-      onRemind({ message: `Échec de l'envoi du rappel à ${opponent?.username ?? "l'adversaire"}`, variant: "error" });
+      onRemind({ message: `Échec de l'envoi du rappel à ${game.currentPlayerId}`, variant: "error" });
     } finally {
       setReminding(false);
     }
@@ -236,7 +303,17 @@ function GameRow({
     <li className={`games-list__item${isMyTurn ? " games-list__item--active" : ""}`}>
       <button type="button" className="games-list__item-open" onClick={onOpen}>
         <span className="games-list__score">
-          {me?.score ?? 0} – {opponent?.score ?? 0}
+          {scoreRow.map((p, i) => (
+            <span key={p.username}>
+              {i > 0 && " – "}
+              <span
+                className={isThirdSeat(game.players, p.username) ? "games-list__score-third" : undefined}
+                title={p.username === username ? "Vous" : p.username}
+              >
+                {p.score}
+              </span>
+            </span>
+          ))}
         </span>
         {status && <span className="games-list__status">{status}</span>}
       </button>

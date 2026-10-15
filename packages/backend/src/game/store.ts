@@ -1,24 +1,27 @@
 import { pool } from "../db/pool.js";
-import { config } from "../config.js";
 import type { GameSummary } from "@scrabble/shared";
 import { createGame, type InternalGame } from "./gameEngine.js";
 
 const cache = new Map<string, InternalGame>();
 
-export async function createNewGame(): Promise<InternalGame> {
-  const game = createGame(config.players.player1.username, config.players.player2.username);
+/** `usernames` is the turn order: the first one plays first. */
+export async function createNewGame(usernames: string[]): Promise<InternalGame> {
+  const game = createGame(usernames);
   cache.set(game.id, game);
   await persistGame(game);
   return game;
 }
 
-export async function listGames(): Promise<GameSummary[]> {
+/** The games `username` takes part in, most recently active first. */
+export async function listGames(username: string): Promise<GameSummary[]> {
   const { rows } = await pool.query(
     `SELECT g.id, g.status, g.current_player_username, g.created_at, g.updated_at, g.last_reminded_at,
             p.username, p.score
      FROM games g
      JOIN game_players p ON p.game_id = g.id
-     ORDER BY g.updated_at DESC, p.username ASC`
+     WHERE g.id IN (SELECT game_id FROM game_players WHERE username = $1)
+     ORDER BY g.updated_at DESC, g.id, p.seat NULLS LAST, p.username ASC`,
+    [username]
   );
 
   const byId = new Map<string, GameSummary>();
@@ -28,7 +31,7 @@ export async function listGames(): Promise<GameSummary[]> {
       summary = {
         id: row.id,
         status: row.status,
-        players: [] as unknown as GameSummary["players"],
+        players: [],
         currentPlayerId: row.current_player_username,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
@@ -36,7 +39,7 @@ export async function listGames(): Promise<GameSummary[]> {
       };
       byId.set(row.id, summary);
     }
-    (summary.players as { username: string; score: number }[]).push({
+    summary.players.push({
       username: row.username,
       score: row.score,
     });
@@ -54,7 +57,9 @@ export async function loadGame(id: string): Promise<InternalGame> {
   const row = rows[0];
 
   const { rows: playerRows } = await pool.query(
-    `SELECT username, score, rack FROM game_players WHERE game_id = $1`,
+    // Games created before seats existed have none; with only 2 players,
+    // their order doesn't matter for turn rotation.
+    `SELECT username, score, rack FROM game_players WHERE game_id = $1 ORDER BY seat NULLS LAST, username`,
     [id]
   );
   const players = playerRows.map((p) => ({
@@ -62,7 +67,7 @@ export async function loadGame(id: string): Promise<InternalGame> {
     username: p.username,
     score: p.score,
     rack: p.rack,
-  })) as InternalGame["players"];
+  }));
 
   const { rows: lastMoveRows } = await pool.query(
     `SELECT username, words, score, tiles FROM moves WHERE game_id = $1 AND kind = 'place' ORDER BY created_at DESC LIMIT 1`,
@@ -137,14 +142,15 @@ export async function persistGame(game: InternalGame): Promise<void> {
     ]
   );
 
-  for (const player of game.players) {
+  for (const [seat, player] of game.players.entries()) {
     await pool.query(
-      `INSERT INTO game_players (game_id, username, score, rack)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO game_players (game_id, username, seat, score, rack)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (game_id, username) DO UPDATE SET
+         seat = EXCLUDED.seat,
          score = EXCLUDED.score,
          rack = EXCLUDED.rack`,
-      [game.id, player.username, player.score, JSON.stringify(player.rack)]
+      [game.id, player.username, seat, player.score, JSON.stringify(player.rack)]
     );
   }
 }

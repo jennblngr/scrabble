@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import type { GameState, MoveResult, PlacedTile, RackTile } from "@scrabble/shared";
+import type { GameState, MoveResult, PlacedTile, Player, RackTile } from "@scrabble/shared";
 import { getSocket } from "../api/socket";
 import { subscribeToPush } from "../push";
 import { ZoomableBoard } from "../components/ZoomableBoard";
 import { Rack } from "../components/Rack";
 import { Tile } from "../components/Tile";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { isThirdSeat } from "../players";
 
 interface GameProps {
   username: string;
@@ -90,6 +91,37 @@ function useDisplayedScore(value: number, anim: ScoreAnim | null) {
   }, [anim, value]);
 
   return display;
+}
+
+function ScoreColumn({
+  player,
+  label,
+  align,
+  active,
+  third,
+  anim,
+}: {
+  player: Player;
+  label: string;
+  align: "left" | "center" | "right";
+  active: boolean;
+  third: boolean;
+  anim: ScoreAnim | null;
+}) {
+  const displayScore = useDisplayedScore(player.score, anim);
+  return (
+    <div
+      className={`scores__col${align === "left" ? "" : ` scores__col--${align}`}${third ? " scores__col--third" : ""}${
+        active ? " scores__col--active" : ""
+      }${anim ? " scores__col--halo" : ""}`}
+    >
+      <span className="scores__name">{label}</span>
+      <span className="scores__value-row">
+        <span className="scores__value">{displayScore}</span>
+        {anim && <span className="scores__delta">+{anim.to - anim.from}</span>}
+      </span>
+    </div>
+  );
 }
 
 export function Game({ username, gameId, onBack }: GameProps) {
@@ -289,22 +321,30 @@ export function Game({ username, gameId, onBack }: GameProps) {
   }, [bagBlink]);
 
   const me = useMemo(() => state?.players.find((p) => p.username === username) ?? null, [state, username]);
-  const opponent = useMemo(() => state?.players.find((p) => p.username !== username) ?? null, [state, username]);
+  // In turn order, so the score columns read in the order players take turns.
+  const opponents = useMemo(() => state?.players.filter((p) => p.username !== username) ?? [], [state, username]);
   const isMyTurn = state?.currentPlayerId === username;
+  const players = state?.players ?? [];
 
-  const meAnim = scoreAnim?.username === username ? scoreAnim : null;
-  const opponentAnim = opponent && scoreAnim?.username === opponent.username ? scoreAnim : null;
-  const meDisplayScore = useDisplayedScore(me?.score ?? 0, meAnim);
-  const opponentDisplayScore = useDisplayedScore(opponent?.score ?? 0, opponentAnim);
+  // Blue instead of red on the board while it highlights a move by the third
+  // seat of a 3-player game: the just-played halo, or the "while you were
+  // away" dots.
+  const boardShowsThirdSeatMove =
+    (!!scoreAnim && isThirdSeat(players, scoreAnim.username)) ||
+    (unseenOpponentCells.size > 0 && isThirdSeat(players, state?.lastMove?.username));
 
   const lastMoveText = useMemo(() => {
     const lastMove = state?.lastMove;
     if (!lastMove) return null;
     const isMe = lastMove.username === username;
+    const third = isThirdSeat(state.players, lastMove.username);
     return (
       <>
         <strong>{isMe ? "Vous" : lastMove.username}</strong> {isMe ? "avez" : "a"} joué{" "}
-        <strong className="game__status-word">{lastMove.words.join(" + ")}</strong> pour{" "}
+        <strong className={`game__status-word${third ? " game__status-word--third" : ""}`}>
+          {lastMove.words.join(" + ")}
+        </strong>{" "}
+        pour{" "}
         <strong>{lastMove.score} points</strong>
       </>
     );
@@ -605,6 +645,10 @@ export function Game({ username, gameId, onBack }: GameProps) {
                 <>
                   À <strong>toi</strong> de jouer
                 </>
+              ) : opponents.length > 1 ? (
+                <>
+                  En attente de <strong>{state.currentPlayerId}</strong>
+                </>
               ) : (
                 "En attente de l'adversaire"
               ))}
@@ -615,29 +659,22 @@ export function Game({ username, gameId, onBack }: GameProps) {
       </header>
 
       <div className="scores">
-        <div
-          className={`scores__col${isMyTurn ? " scores__col--active" : ""}${meAnim ? " scores__col--halo" : ""}`}
-        >
-          <span className="scores__name">Vous</span>
-          <span className="scores__value-row">
-            <span className="scores__value">{meDisplayScore}</span>
-            {meAnim && <span className="scores__delta">+{meAnim.to - meAnim.from}</span>}
-          </span>
-        </div>
-        <div
-          className={`scores__col scores__col--right${!isMyTurn ? " scores__col--active" : ""}${
-            opponentAnim ? " scores__col--halo" : ""
-          }`}
-        >
-          <span className="scores__name">{opponent?.username}</span>
-          <span className="scores__value-row">
-            <span className="scores__value">{opponentDisplayScore}</span>
-            {opponentAnim && <span className="scores__delta">+{opponentAnim.to - opponentAnim.from}</span>}
-          </span>
-        </div>
+        {[me, ...opponents].map((player, i, all) =>
+          player ? (
+            <ScoreColumn
+              key={player.username}
+              player={player}
+              label={player === me ? "Vous" : player.username}
+              align={i === 0 ? "left" : i === all.length - 1 ? "right" : "center"}
+              active={state.currentPlayerId === player.username}
+              third={isThirdSeat(state.players, player.username)}
+              anim={scoreAnim?.username === player.username ? scoreAnim : null}
+            />
+          ) : null
+        )}
       </div>
 
-      <div className="game__board-area">
+      <div className={`game__board-area${boardShowsThirdSeatMove ? " game__board-area--third" : ""}`}>
         <ZoomableBoard
           board={state.board}
           pending={pending}

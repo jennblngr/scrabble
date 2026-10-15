@@ -5,8 +5,12 @@ export function listGames(): Promise<{ games: GameSummary[] }> {
   return request<{ games: GameSummary[] }>("/api/games");
 }
 
-export function createGame(): Promise<{ gameId: string }> {
-  return request<{ gameId: string }>("/api/games", { method: "POST" });
+/** Without `opponents`, the server falls back to its default pairing. */
+export function createGame(opponents?: string[]): Promise<{ gameId: string }> {
+  return request<{ gameId: string }>("/api/games", {
+    method: "POST",
+    body: opponents ? JSON.stringify({ opponents }) : undefined,
+  });
 }
 
 export function remindOpponent(gameId: string): Promise<{ ok: true }> {

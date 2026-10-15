@@ -1,4 +1,4 @@
--- Two known players authenticate via env-configured credentials (see config.ts),
+-- The 2 or 3 known players authenticate via env-configured credentials (see config.ts),
 -- so there is no public "users" table — the username is just a string key here.
 
 CREATE TABLE IF NOT EXISTS games (
@@ -22,6 +22,10 @@ CREATE TABLE IF NOT EXISTS game_players (
   rack JSONB NOT NULL DEFAULT '[]',
   PRIMARY KEY (game_id, username)
 );
+
+-- Turn order within the game (0 plays first). NULL for games created before
+-- 3-player games existed, which only ever had 2 players.
+ALTER TABLE game_players ADD COLUMN IF NOT EXISTS seat INTEGER;
 
 CREATE TABLE IF NOT EXISTS moves (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

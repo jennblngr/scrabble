@@ -1,7 +1,8 @@
 import Fastify from "fastify";
-import { config } from "./config.js";
+import { config, knownPlayers } from "./config.js";
 import { registerAuth, getUsernameFromRequest } from "./auth/auth.js";
 import { createNewGame, listGames, loadGame, markReminded, deleteGame } from "./game/store.js";
+import { MAX_PLAYERS } from "./game/gameEngine.js";
 import { saveSubscription, notifyUser } from "./push.js";
 import { setupSocket } from "./socket/index.js";
 
@@ -14,17 +15,29 @@ app.get("/api/health", async () => ({ ok: true }));
 app.get("/api/games", async (req, reply) => {
   const username = getUsernameFromRequest(req);
   if (!username) return reply.code(401).send({ error: "Non authentifié" });
-  return { games: await listGames() };
+  return { games: await listGames(username) };
 });
 
-app.post("/api/games", async (req, reply) => {
+app.post<{ Body: { opponents?: string[] } | undefined }>("/api/games", async (req, reply) => {
   const username = getUsernameFromRequest(req);
   if (!username) return reply.code(401).send({ error: "Non authentifié" });
-  const game = await createNewGame();
 
-  const opponent = game.players.find((p) => p.username !== username);
-  if (opponent) {
-    await notifyUser(opponent.username, {
+  // Without an explicit choice (clients from before 3-player games), keep the
+  // original pairing: player1 against player2.
+  const opponents = req.body?.opponents ?? [config.players.player1.username, config.players.player2.username];
+  const participants = new Set([username, ...opponents]);
+  const validOpponents = opponents.every((o) => knownPlayers.some((p) => p.username === o));
+  if (!validOpponents || participants.size < 2 || participants.size > MAX_PLAYERS) {
+    return reply.code(400).send({ error: "Choix des joueurs invalide" });
+  }
+
+  // Turn order follows the accounts' configured order, whoever creates the game.
+  const usernames = knownPlayers.map((p) => p.username).filter((u) => participants.has(u));
+  const game = await createNewGame(usernames);
+
+  for (const player of game.players) {
+    if (player.username === username) continue;
+    await notifyUser(player.username, {
       title: "Scrabble",
       body: `${username} a lancé une nouvelle partie !`,
     });
@@ -65,9 +78,9 @@ app.delete<{ Params: { id: string } }>("/api/games/:id", async (req, reply) => {
   const username = getUsernameFromRequest(req);
   if (!username) return reply.code(401).send({ error: "Non authentifié" });
 
-  // Comme la liste des parties, la suppression n'est pas limitée aux joueurs
-  // de cette partie précise : ce sont les 2 seuls comptes de l'appli et ils
-  // partagent la même liste (y compris les vieilles parties de test).
+  // La suppression n'est pas limitée aux joueurs de la partie : l'appli est
+  // privée, et chaque joueur ne voit de toute façon que ses propres parties
+  // dans la liste.
   await deleteGame(req.params.id);
   return { ok: true };
 });

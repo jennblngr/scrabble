@@ -5,14 +5,19 @@ import { createBag, fillRack, LETTER_VALUES, RACK_SIZE } from "./tiles.js";
 import { MoveError, validateAndExtractWords } from "./rules.js";
 import { scoreMove } from "./scoring.js";
 
-const MAX_CONSECUTIVE_NON_PLAYS = 4; // 2 passes/exchanges per player with no tile placed ends the game
+// 2 passes/exchanges per player in a row with no tile placed ends the game.
+const NON_PLAYS_PER_PLAYER = 2;
+
+export const MIN_PLAYERS = 2;
+export const MAX_PLAYERS = 3;
 
 export interface InternalGame {
   id: string;
   status: GameState["status"];
   board: Board;
   bag: string[];
-  players: [Player, Player];
+  /** In turn order. */
+  players: Player[];
   currentPlayerId: string;
   consecutivePasses: number;
   lastMove: LastMove | null;
@@ -22,12 +27,18 @@ export interface InternalGame {
   lastRemindedAt: string | null;
 }
 
-export function createGame(player1Username: string, player2Username: string): InternalGame {
+/** `usernames` is the turn order: the first one plays first. */
+export function createGame(usernames: string[]): InternalGame {
+  if (usernames.length < MIN_PLAYERS || usernames.length > MAX_PLAYERS) {
+    throw new Error(`A game needs ${MIN_PLAYERS} to ${MAX_PLAYERS} players.`);
+  }
+
   let bag = createBag();
-  const p1Draw = fillRack(bag, []);
-  bag = p1Draw.bag;
-  const p2Draw = fillRack(bag, []);
-  bag = p2Draw.bag;
+  const players: Player[] = usernames.map((username) => {
+    const draw = fillRack(bag, []);
+    bag = draw.bag;
+    return { id: username, username, score: 0, rack: draw.rack };
+  });
 
   const now = new Date().toISOString();
   return {
@@ -35,11 +46,8 @@ export function createGame(player1Username: string, player2Username: string): In
     status: "in_progress",
     board: createEmptyBoard(),
     bag,
-    players: [
-      { id: player1Username, username: player1Username, score: 0, rack: p1Draw.rack },
-      { id: player2Username, username: player2Username, score: 0, rack: p2Draw.rack },
-    ],
-    currentPlayerId: player1Username,
+    players,
+    currentPlayerId: usernames[0],
     consecutivePasses: 0,
     lastMove: null,
     isFirstMove: true,
@@ -69,16 +77,13 @@ function requireTurn(game: InternalGame, username: string) {
   if (game.currentPlayerId !== username) throw new MoveError("Ce n'est pas ton tour.");
 }
 
-function otherPlayer(game: InternalGame, username: string): Player {
-  return game.players.find((p) => p.username !== username)!;
-}
-
 function currentPlayer(game: InternalGame, username: string): Player {
   return game.players.find((p) => p.username === username)!;
 }
 
 function advanceTurn(game: InternalGame) {
-  game.currentPlayerId = otherPlayer(game, game.currentPlayerId).username;
+  const index = game.players.findIndex((p) => p.username === game.currentPlayerId);
+  game.currentPlayerId = game.players[(index + 1) % game.players.length].username;
   game.updatedAt = new Date().toISOString();
 }
 
@@ -154,11 +159,15 @@ export function applyPlace(game: InternalGame, username: string, placed: PlacedT
 export function applyPass(game: InternalGame, username: string) {
   requireTurn(game, username);
   game.consecutivePasses += 1;
-  if (game.consecutivePasses >= MAX_CONSECUTIVE_NON_PLAYS) {
+  if (tooManyNonPlays(game)) {
     finishGameByExhaustion(game);
   } else {
     advanceTurn(game);
   }
+}
+
+function tooManyNonPlays(game: InternalGame): boolean {
+  return game.consecutivePasses >= NON_PLAYS_PER_PLAYER * game.players.length;
 }
 
 export function applyExchange(game: InternalGame, username: string, rackTileIds: string[]) {
@@ -182,7 +191,7 @@ export function applyExchange(game: InternalGame, username: string, rackTileIds:
   game.bag = bag;
   game.consecutivePasses += 1;
 
-  if (game.consecutivePasses >= MAX_CONSECUTIVE_NON_PLAYS) {
+  if (tooManyNonPlays(game)) {
     finishGameByExhaustion(game);
   } else {
     advanceTurn(game);
@@ -202,13 +211,19 @@ function rackValue(rack: RackTile[]): number {
   return rack.reduce((sum, t) => sum + (t.letter === "" ? 0 : LETTER_VALUES[t.letter] ?? 0), 0);
 }
 
-/** A player emptied their rack with an empty bag: standard end-game scoring. */
+/**
+ * A player emptied their rack with an empty bag: standard end-game scoring.
+ * Each opponent loses the value of their own rack, and the finisher gains the
+ * total of all of them.
+ */
 function finishGameEarly(game: InternalGame, finisherUsername: string) {
   const finisher = currentPlayer(game, finisherUsername);
-  const opponent = otherPlayer(game, finisherUsername);
-  const opponentRackValue = rackValue(opponent.rack);
-  finisher.score += opponentRackValue;
-  opponent.score -= opponentRackValue;
+  for (const opponent of game.players) {
+    if (opponent === finisher) continue;
+    const opponentRackValue = rackValue(opponent.rack);
+    finisher.score += opponentRackValue;
+    opponent.score -= opponentRackValue;
+  }
   game.status = "finished";
 }
 
