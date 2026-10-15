@@ -8,6 +8,10 @@
   --color-accent: #c0392b;
   --color-accent-contrast: #ffffff;
   --color-accent-soft-bg: rgba(192, 57, 43, 0.12);
+  /* Third seat of a 3-player game: the accent's blue twin (same saturation
+     and lightness as the red, hue moved to blue). */
+  --color-accent-third: #2b70bf;
+  --color-accent-third-soft-bg: rgba(43, 112, 191, 0.12);
   --color-border: rgba(43, 38, 32, 0.15);
   --color-disabled-bg: rgba(43, 38, 32, 0.16);
   --color-disabled-text: rgba(43, 38, 32, 0.35);
@@ -49,6 +53,8 @@
     --color-accent: #c0392b;
     --color-accent-contrast: #ffffff;
     --color-accent-soft-bg: rgba(192, 57, 43, 0.2);
+    --color-accent-third: #2b70bf;
+    --color-accent-third-soft-bg: rgba(43, 112, 191, 0.2);
     --color-border: rgba(243, 236, 221, 0.14);
     --color-disabled-bg: rgba(243, 236, 221, 0.14);
     --color-disabled-text: rgba(243, 236, 221, 0.35);
@@ -89,6 +95,8 @@
   --color-accent: #c0392b;
   --color-accent-contrast: #ffffff;
   --color-accent-soft-bg: rgba(192, 57, 43, 0.2);
+  --color-accent-third: #2b70bf;
+  --color-accent-third-soft-bg: rgba(43, 112, 191, 0.2);
   --color-border: rgba(243, 236, 221, 0.14);
   --color-disabled-bg: rgba(243, 236, 221, 0.14);
   --color-disabled-text: rgba(243, 236, 221, 0.35);
@@ -367,7 +375,11 @@ body {
 }
 
 .scores__col {
+  /* Per-player accent: red, or blue for the third player as the viewer sees
+     them (--third below, see players.ts). */
+  --player-accent: var(--color-accent);
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -378,14 +390,26 @@ body {
   transition: background-color 0.4s ease, border-color 0.4s ease;
 }
 
+.scores__col--center {
+  align-items: center;
+}
+
 .scores__col--right {
   align-items: flex-end;
 }
 
+.scores__col--third {
+  --player-accent: var(--color-accent-third);
+}
+
 .scores__name {
+  max-width: 100%;
   font-size: 0.7rem;
   font-weight: 600;
   color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .scores__value {
@@ -397,7 +421,7 @@ body {
 
 .scores__col--active {
   border-color: transparent;
-  background: var(--color-accent);
+  background: var(--player-accent);
 }
 
 .scores__col--active .scores__name {
@@ -422,7 +446,7 @@ body {
 .scores__delta {
   font-size: 0.75rem;
   font-weight: 700;
-  color: var(--color-accent);
+  color: var(--player-accent);
   animation: score-plus 1.6s ease forwards;
 }
 
@@ -431,10 +455,10 @@ body {
 }
 
 @keyframes score-halo {
-  0% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 1); }
-  15% { box-shadow: 0 0 0 4px rgba(192, 57, 43, 1); }
-  78% { box-shadow: 0 0 0 4px rgba(192, 57, 43, 1); }
-  100% { box-shadow: 0 0 0 0 rgba(192, 57, 43, 1); }
+  0% { box-shadow: 0 0 0 0 var(--player-accent); }
+  15% { box-shadow: 0 0 0 4px var(--player-accent); }
+  78% { box-shadow: 0 0 0 4px var(--player-accent); }
+  100% { box-shadow: 0 0 0 0 var(--player-accent); }
 }
 
 @keyframes score-plus {
@@ -455,8 +479,57 @@ body {
   overflow-wrap: break-word;
 }
 
+/* See components/Ticker.tsx. */
+.ticker {
+  overflow: hidden;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.ticker__content {
+  display: inline-block;
+  will-change: transform;
+}
+
+/* Scrolling: start from the left edge, and soften both edges so the text
+   reads as sliding under them rather than being cut. */
+.ticker--scrolling {
+  text-align: left;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8px, #000 calc(100% - 12px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8px, #000 calc(100% - 12px), transparent);
+}
+
+.ticker--scrolling .ticker__content {
+  padding: 0 12px 0 8px;
+}
+
+.ticker--wrap {
+  white-space: normal;
+}
+
+.ticker--wrap .ticker__content {
+  display: inline;
+}
+
+.game__status-separator {
+  margin: 0 0.6em;
+  opacity: 0.6;
+}
+
 .game__status-word {
   color: var(--color-accent);
+}
+
+.game__status-word--third,
+.game__status-name--third {
+  color: var(--color-accent-third);
+}
+
+/* While the board halos a move just played by the viewer's third player, its accent
+   turns blue. */
+.game__board-area--third {
+  --color-accent: var(--color-accent-third);
+  --color-accent-soft-bg: var(--color-accent-third-soft-bg);
 }
 
 .game__status--error {
@@ -516,6 +589,20 @@ body {
 }
 
 .board-viewport {
+  /* Board text (bonus labels, tile letters and values) is sized in cqw, i.e.
+     relative to the board's own width, so it keeps the same proportions on
+     every screen. A cell is ~6.3cqw wide (1/15 of the board minus the grid
+     lines); the comments give each size as a share of a cell. Zooming scales
+     the board with a transform, which leaves these layout sizes untouched, so
+     text zooms along with the cells. */
+  container-type: inline-size;
+  --board-bonus-font: 2.7cqw; /* ~43% of a cell */
+  --board-center-font: 3.4cqw;
+  --board-letter-font: 3.8cqw; /* ~60% of a cell */
+  --board-value-font: 1.7cqw; /* ~27% of a cell */
+  --board-value-inset: 0.35cqw;
+  --board-dot-size: 1.3cqw;
+  --board-dot-inset: 0.45cqw;
   position: relative;
   width: 100%;
   max-width: 100%;
@@ -667,15 +754,15 @@ body {
 
 .board__cell--empty {
   background: var(--board-cell-empty-bg);
-  font-size: 0.55rem;
+  font-size: var(--board-bonus-font);
   font-weight: 700;
 }
 
-.board__cell--TW { background: var(--board-mt-bg); color: var(--board-mt-text); font-size: 0.55rem; font-weight: 700; }
-.board__cell--DW { background: var(--board-md-bg); color: var(--board-md-text); font-size: 0.55rem; font-weight: 700; }
-.board__cell--TL { background: var(--board-lt-bg); color: var(--board-lt-text); font-size: 0.55rem; font-weight: 700; }
-.board__cell--DL { background: var(--board-ld-bg); color: var(--board-ld-text); font-size: 0.55rem; font-weight: 700; }
-.board__cell--CENTER { background: var(--board-md-bg); color: var(--board-md-text); font-size: 0.7rem; font-weight: 700; }
+.board__cell--TW { background: var(--board-mt-bg); color: var(--board-mt-text); font-size: var(--board-bonus-font); font-weight: 700; }
+.board__cell--DW { background: var(--board-md-bg); color: var(--board-md-text); font-size: var(--board-bonus-font); font-weight: 700; }
+.board__cell--TL { background: var(--board-lt-bg); color: var(--board-lt-text); font-size: var(--board-bonus-font); font-weight: 700; }
+.board__cell--DL { background: var(--board-ld-bg); color: var(--board-ld-text); font-size: var(--board-bonus-font); font-weight: 700; }
+.board__cell--CENTER { background: var(--board-md-bg); color: var(--board-md-text); font-size: var(--board-center-font); font-weight: 700; }
 
 .rack {
   display: flex;
@@ -734,8 +821,12 @@ body {
 .board .tile {
   width: 100%;
   height: 100%;
+  /* The browser's default button padding (1px 6px) would leave a ~9px-wide
+     content box on a phone-sized cell, pushing the letter off-center. */
+  padding: 0;
+  line-height: 1;
   border-radius: 0;
-  font-size: 1rem;
+  font-size: var(--board-letter-font);
   box-shadow: none;
 }
 
@@ -782,16 +873,20 @@ body {
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* Marks a tile played by the opponent while this player was away (see
+/* Marks a tile an opponent placed since this player's last turn (see
    unseenOpponentCells in Game.tsx). */
 .tile__unseen-dot {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 6px;
-  height: 6px;
+  top: var(--board-dot-inset);
+  right: var(--board-dot-inset);
+  width: var(--board-dot-size);
+  height: var(--board-dot-size);
   border-radius: 50%;
   background: var(--color-accent);
+}
+
+.tile__unseen-dot--third {
+  background: var(--color-accent-third);
 }
 
 /* Validated state: the dashed layers cross-fade into the filled ones, so the
@@ -924,10 +1019,17 @@ body {
   opacity: 0.75;
 }
 
+.board .tile__letter {
+  position: relative;
+  left: -0.25cqw;
+  top: -0.15cqw;
+}
+
 .board .tile__value {
-  bottom: -1px;
-  right: 1px;
-  font-size: 0.45rem;
+  bottom: var(--board-value-inset);
+  right: var(--board-value-inset);
+  line-height: 1;
+  font-size: var(--board-value-font);
 }
 
 .game__actions {
@@ -1044,6 +1146,187 @@ body {
   cursor: default;
 }
 
+.new-game {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 8px 0 4px;
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+
+.new-game__step {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.new-game__step legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.new-game__counts {
+  display: flex;
+  gap: 8px;
+}
+
+.new-game__count,
+.new-game__player {
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.new-game__count {
+  flex: 1;
+  padding: 10px 12px;
+}
+
+.new-game__count[aria-pressed="true"],
+.new-game__player[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft-bg);
+}
+
+.new-game__count:disabled,
+.new-game__player:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.new-game__players {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.new-game__player {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+}
+
+.new-game__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  color: var(--color-accent-contrast);
+}
+
+.new-game__player[aria-pressed="true"] .new-game__check {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.new-game__step legend,
+.new-game__label {
+  display: block;
+}
+
+.new-game__label {
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.invite__input,
+.invite__link {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.invite__link {
+  font-size: 0.8rem;
+}
+
+.invite__intro,
+.invite__note {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.invite__note {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.invitation__intro,
+.invitation__message {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.invitation__message {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.invitation__secondary {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.new-game__start {
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+}
+
+.new-game__start:disabled {
+  background: var(--color-disabled-bg);
+  color: var(--color-disabled-text);
+  cursor: default;
+}
+
 .games-list__empty {
   opacity: 0.7;
   font-size: 0.9rem;
@@ -1088,6 +1371,10 @@ body {
   flex: 1;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
+}
+
+.games-list__score-third {
+  color: var(--color-accent-third);
 }
 
 .games-list__status {

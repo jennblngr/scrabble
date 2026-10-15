@@ -1,6 +1,6 @@
 # Scrabble à deux
 
-Scrabble francophone en temps réel pour 2 joueurs, jouable à distance. PWA (React) + backend Node/Fastify/Socket.io + PostgreSQL, pensé pour un usage strictement privé (2 comptes connus, pas d'inscription publique).
+Scrabble francophone en temps réel pour 2 ou 3 joueurs, jouable à distance. PWA (React) + backend Node/Fastify/Socket.io + PostgreSQL, pensé pour un usage strictement privé (comptes connus, nouveaux joueurs uniquement sur invitation, pas d'inscription publique).
 
 ## Arborescence
 
@@ -19,17 +19,25 @@ nginx/scrabble.conf       config nginx à installer sur le VPS (reverse proxy + 
 1. Copier `.env.example` en `.env` et remplir les valeurs (voir ci-dessous pour les mots de passe et les clés VAPID).
 2. Lancer Postgres : `docker compose up -d`
 3. Installer les dépendances : `npm install` (à la racine, npm workspaces gère les 3 packages)
-4. Appliquer le schéma : `npm run db:migrate`
+4. Appliquer le schéma : `npm run db:migrate` (facultatif : le backend l'applique aussi à chaque démarrage, le schéma étant idempotent)
 5. Lancer le backend : `npm run dev:backend` (port 4000)
 6. Lancer le frontend : `npm run dev:frontend` (Vite proxy `/api` et `/socket.io` vers le backend)
 
-### Générer les mots de passe des 2 joueurs
+### Générer les mots de passe des joueurs
 
 ```
 node packages/backend/scripts/hash-password.mjs "motdepasse"
 ```
 
 Coller le hash obtenu dans `PLAYER1_PASSWORD_HASH` / `PLAYER2_PASSWORD_HASH` du `.env`. Les pseudos (`PLAYER1_USERNAME` / `PLAYER2_USERNAME`) sont aussi affichés comme choix rapides sur la page de connexion, via `GET /api/auth/players`.
+
+### Inviter un joueur / mot de passe oublié
+
+Les autres joueurs n'ont pas besoin d'être configurés dans le `.env` : depuis la liste des parties, le bouton « Inviter un joueur » (icône en haut) génère un lien à lui envoyer, sur lequel il choisit lui-même son mot de passe. Le même panneau, onglet « Mot de passe oublié », génère un lien pour choisir un nouveau mot de passe (y compris pour les 2 joueurs du `.env`, dont le hash est alors remplacé par celui enregistré en base).
+
+Les liens sont de la forme `https://…/#/invitation/<jeton>`, valables 7 jours et utilisables une seule fois ; seul un hash SHA-256 du jeton est stocké (table `invitations`), et les comptes créés vivent dans la table `accounts`. Seul un joueur connecté peut créer un lien.
+
+« Nouvelle partie » ouvre un formulaire : choisir 2 ou 3 joueurs, puis ses adversaires, avant de lancer la partie avec « Commencer la partie ». L'ordre de jeu suit l'ordre des comptes (les 2 joueurs du `.env`, puis les invités par ordre d'arrivée), et dans une partie à 3, les couleurs dépendent du joueur connecté : lui et le joueur suivant restent en rouge, le troisième (celui qui joue juste avant lui) est en bleu. Chaque joueur ne voit que les parties auxquelles il participe.
 
 ### Générer les clés VAPID (notifications push)
 

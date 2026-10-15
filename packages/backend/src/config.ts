@@ -12,6 +12,11 @@ function required(name: string, value: string | undefined): string {
   return value;
 }
 
+export interface KnownPlayer {
+  username: string;
+  passwordHash: string;
+}
+
 export const config = {
   port: Number(process.env.PORT ?? 4000),
   databaseUrl: required("DATABASE_URL", process.env.DATABASE_URL),

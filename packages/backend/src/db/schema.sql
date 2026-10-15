@@ -1,4 +1,4 @@
--- Two known players authenticate via env-configured credentials (see config.ts),
+-- The 2 or 3 known players authenticate via env-configured credentials (see config.ts),
 -- so there is no public "users" table — the username is just a string key here.
 
 CREATE TABLE IF NOT EXISTS games (
@@ -23,6 +23,10 @@ CREATE TABLE IF NOT EXISTS game_players (
   PRIMARY KEY (game_id, username)
 );
 
+-- Turn order within the game (0 plays first). NULL for games created before
+-- 3-player games existed, which only ever had 2 players.
+ALTER TABLE game_players ADD COLUMN IF NOT EXISTS seat INTEGER;
+
 CREATE TABLE IF NOT EXISTS moves (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   game_id UUID NOT NULL REFERENCES games(id) ON DELETE CASCADE,
@@ -43,3 +47,23 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 );
 
 CREATE INDEX IF NOT EXISTS moves_game_id_idx ON moves(game_id);
+
+-- Accounts created through an invitation link, plus password overrides for
+-- the env-configured players (set through a reset link). See accounts.ts.
+CREATE TABLE IF NOT EXISTS accounts (
+  username TEXT PRIMARY KEY,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Single-use links: 'invite' creates a new account, 'reset' sets a new
+-- password for an existing one. Only a SHA-256 of the token is stored.
+CREATE TABLE IF NOT EXISTS invitations (
+  token_hash TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('invite', 'reset')),
+  username TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ
+);

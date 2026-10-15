@@ -22,7 +22,8 @@ interface BoardProps {
   moveScore?: number | null;
   // "row,col" of opponent tiles played while this player was away, shown
   // with a small dot instead of the halo above.
-  unseenOpponentCells?: Set<string>;
+  // "row,col" -> color of the dot, for tiles played while this player was away.
+  unseenOpponentCells?: Map<string, "accent" | "third">;
 }
 
 const BONUS_LABEL: Record<string, string> = {
@@ -167,7 +168,7 @@ export function Board({
                   isBlank={isBlank}
                   faded={!!pendingTile}
                   draggable={!!pendingTile}
-                  unseen={!pendingTile && !!unseenOpponentCells?.has(key)}
+                  unseen={pendingTile ? undefined : unseenOpponentCells?.get(key)}
                   {...(pendingTile ? dragHandlers(cell.row, cell.col, letter, isBlank) : {})}
                 />
                 <div className="board__cell__outline" style={previewOutline(cell.row, cell.col)} />

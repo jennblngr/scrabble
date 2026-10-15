@@ -1,11 +1,14 @@
 import { useEffect, useState } from "react";
 import type { GameSummary } from "@scrabble/shared";
 import { listGames, createGame, remindOpponent, deleteGame } from "../api/games";
-import { logout } from "../api/auth";
+import { logout, players as fetchPlayers } from "../api/auth";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { Toast, type ToastState } from "../components/Toast";
+import { isThirdFor, playersFrom } from "../players";
+import { createInvitation, invitationUrl, type InvitationKind } from "../api/invitations";
 
 const REMINDER_DELAY_MS = 24 * 60 * 60 * 1000;
+const PLAYER_COUNTS = [2, 3];
 
 interface GamesListProps {
   username: string;
@@ -18,6 +21,10 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [toast, setToast] = useState<ToastState>(null);
+  const [allPlayers, setAllPlayers] = useState<string[]>([]);
+  const [choosing, setChoosing] = useState(false);
+  const [inviting, setInviting] = useState(false);
+  const otherPlayers = allPlayers.filter((u) => u !== username);
 
   function refresh() {
     listGames()
@@ -26,6 +33,14 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
   }
 
   useEffect(refresh, []);
+
+  useEffect(() => {
+    fetchPlayers()
+      .then(({ usernames }) => setAllPlayers(usernames))
+      .catch(() => {
+        /* without the list, creating a game falls back to the default pairing */
+      });
+  }, [username]);
 
   // Reprendre l'app depuis l'arrière-plan (PWA remise au premier plan, onglet
   // réactivé, retour depuis le cache de navigation) ne remonte pas ce
@@ -43,11 +58,11 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
     };
   }, []);
 
-  async function handleCreate() {
+  async function handleCreate(opponents: string[]) {
     setError(null);
     setCreating(true);
     try {
-      const { gameId } = await createGame();
+      const { gameId } = await createGame(opponents);
       onOpenGame(gameId);
     } catch (err) {
       setError((err as Error).message);
@@ -80,6 +95,24 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
           <button
             type="button"
             className="icon-btn"
+            onClick={() => {
+              setInviting((v) => !v);
+              setChoosing(false);
+            }}
+            aria-label="Inviter un joueur"
+            aria-expanded={inviting}
+            title="Inviter un joueur"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="8.5" cy="7" r="4"></circle>
+              <line x1="20" y1="8" x2="20" y2="14"></line>
+              <line x1="23" y1="11" x2="17" y2="11"></line>
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="icon-btn"
             onClick={() => logout().then(onLoggedOut)}
             aria-label="Déconnexion"
             title="Déconnexion"
@@ -96,9 +129,24 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
 
       {error && <p className="game__error">{error}</p>}
 
-      <button type="button" className="games-list__new" onClick={handleCreate} disabled={creating}>
-        {creating ? "Création..." : "+ Nouvelle partie"}
+      {inviting && <InvitePanel players={allPlayers} onClose={() => setInviting(false)} />}
+
+      <button
+        type="button"
+        className="games-list__new"
+        onClick={() => {
+          setChoosing((v) => !v);
+          setInviting(false);
+        }}
+        disabled={creating}
+        aria-expanded={choosing}
+      >
+        {choosing ? "Annuler" : "+ Nouvelle partie"}
       </button>
+
+      {choosing && (
+        <NewGameForm otherPlayers={otherPlayers} creating={creating} onStart={handleCreate} />
+      )}
 
       {games === null ? (
         <p className="games-list__empty">Chargement...</p>
@@ -175,6 +223,258 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
   );
 }
 
+function InvitePanel({ players, onClose }: { players: string[]; onClose: () => void }) {
+  const [kind, setKind] = useState<InvitationKind>("invite");
+  const [name, setName] = useState("");
+  const [resetFor, setResetFor] = useState<string | null>(null);
+  const [link, setLink] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const target = kind === "invite" ? name.trim() : resetFor;
+  const canShare = typeof navigator.share === "function";
+
+  function chooseKind(next: InvitationKind) {
+    setKind(next);
+    setLink(null);
+    setError(null);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!target) return;
+    setError(null);
+    setLoading(true);
+    try {
+      const { token } = await createInvitation(kind, target);
+      setLink(invitationUrl(token));
+      setCopied(false);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function copyLink() {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+    } catch {
+      setError("Copie impossible : sélectionne le lien pour le copier.");
+    }
+  }
+
+  function shareLink() {
+    if (!link) return;
+    const text =
+      kind === "invite"
+        ? `${target}, rejoins-nous au Scrabble ! Choisis ton mot de passe ici :`
+        : `Voici le lien pour choisir ton nouveau mot de passe du Scrabble :`;
+    navigator.share({ title: "Scrabble", text, url: link }).catch(() => {
+      /* share sheet dismissed */
+    });
+  }
+
+  if (link) {
+    return (
+      <div className="new-game">
+        <p className="invite__intro">
+          {kind === "invite" ? (
+            <>
+              Envoie ce lien à <strong>{target}</strong> : il lui permet de choisir son mot de passe.
+            </>
+          ) : (
+            <>
+              Envoie ce lien à <strong>{target}</strong> : il lui permet de choisir un nouveau mot de passe.
+            </>
+          )}
+        </p>
+        <input className="invite__link" value={link} readOnly onFocus={(e) => e.target.select()} aria-label="Lien" />
+        <p className="invite__note">Valable 7 jours, utilisable une seule fois.</p>
+        {error && <p className="login__error">{error}</p>}
+        <div className="new-game__counts">
+          <button type="button" className="new-game__count" onClick={copyLink}>
+            {copied ? "Copié !" : "Copier"}
+          </button>
+          {canShare && (
+            <button type="button" className="new-game__count" onClick={shareLink}>
+              Partager
+            </button>
+          )}
+        </div>
+        <button type="button" className="new-game__start" onClick={onClose}>
+          Terminé
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form className="new-game" onSubmit={handleSubmit}>
+      <div className="new-game__counts">
+        <button
+          type="button"
+          className="new-game__count"
+          aria-pressed={kind === "invite"}
+          onClick={() => chooseKind("invite")}
+        >
+          Nouveau joueur
+        </button>
+        <button
+          type="button"
+          className="new-game__count"
+          aria-pressed={kind === "reset"}
+          onClick={() => chooseKind("reset")}
+        >
+          Mot de passe oublié
+        </button>
+      </div>
+
+      {kind === "invite" ? (
+        <label className="new-game__step">
+          <span className="new-game__label">Prénom</span>
+          <input
+            className="invite__input"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={20}
+            autoComplete="off"
+          />
+        </label>
+      ) : (
+        <fieldset className="new-game__step">
+          <legend>Pour quel joueur ?</legend>
+          <ul className="new-game__players">
+            {players.map((p) => (
+              <li key={p}>
+                <button
+                  type="button"
+                  className="new-game__player"
+                  aria-pressed={resetFor === p}
+                  onClick={() => setResetFor(p)}
+                >
+                  <span>{p}</span>
+                  <span className="new-game__check" aria-hidden="true">
+                    {resetFor === p && (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    )}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </fieldset>
+      )}
+
+      {error && <p className="login__error">{error}</p>}
+
+      <button type="submit" className="new-game__start" disabled={!target || loading}>
+        {loading ? "Création..." : "Créer le lien"}
+      </button>
+    </form>
+  );
+}
+
+function NewGameForm({
+  otherPlayers,
+  creating,
+  onStart,
+}: {
+  otherPlayers: string[];
+  creating: boolean;
+  onStart: (opponents: string[]) => void;
+}) {
+  const [playerCount, setPlayerCount] = useState(2);
+  const [selected, setSelected] = useState<string[]>([]);
+  const opponentCount = playerCount - 1;
+
+  function chooseCount(count: number) {
+    setPlayerCount(count);
+    // With exactly as many accounts as seats, there is nobody to pick.
+    setSelected((prev) => (otherPlayers.length === count - 1 ? otherPlayers : prev.slice(0, count - 1)));
+  }
+
+  function togglePlayer(name: string) {
+    setSelected((prev) => {
+      if (prev.includes(name)) return prev.filter((n) => n !== name);
+      // A single opponent to pick behaves like a radio choice.
+      if (opponentCount === 1) return [name];
+      return prev.length < opponentCount ? [...prev, name] : prev;
+    });
+  }
+
+  const ready = selected.length === opponentCount;
+
+  return (
+    <form
+      className="new-game"
+      onSubmit={(e) => {
+        e.preventDefault();
+        // Keep the accounts' order, which is also the order of play.
+        if (ready) onStart(otherPlayers.filter((p) => selected.includes(p)));
+      }}
+    >
+      <fieldset className="new-game__step">
+        <legend>Nombre de joueurs</legend>
+        <div className="new-game__counts">
+          {PLAYER_COUNTS.map((count) => (
+            <button
+              key={count}
+              type="button"
+              className="new-game__count"
+              aria-pressed={playerCount === count}
+              disabled={count - 1 > otherPlayers.length}
+              onClick={() => chooseCount(count)}
+            >
+              {count} joueurs
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="new-game__step">
+        <legend>
+          {opponentCount === 1 ? "Choisis ton adversaire" : `Choisis tes ${opponentCount} adversaires`}
+        </legend>
+        <ul className="new-game__players">
+          {otherPlayers.map((name) => {
+            const isSelected = selected.includes(name);
+            return (
+              <li key={name}>
+                <button
+                  type="button"
+                  className="new-game__player"
+                  aria-pressed={isSelected}
+                  disabled={!isSelected && opponentCount > 1 && selected.length >= opponentCount}
+                  onClick={() => togglePlayer(name)}
+                >
+                  <span>{name}</span>
+                  <span className="new-game__check" aria-hidden="true">
+                    {isSelected && (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    )}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </fieldset>
+
+      <button type="submit" className="new-game__start" disabled={!ready || creating}>
+        {creating ? "Création..." : "Commencer la partie"}
+      </button>
+    </form>
+  );
+}
+
 function GameRow({
   game,
   username,
@@ -192,14 +492,18 @@ function GameRow({
   const [remindHidden, setRemindHidden] = useState(false);
 
   const me = game.players.find((p) => p.username === username);
-  const opponent = game.players.find((p) => p.username !== username);
+  const opponents = playersFrom(game.players, username).slice(1);
   const isMyTurn = game.status !== "finished" && game.currentPlayerId === username;
+  // Me first, then the others in turn order starting after me.
+  const scoreRow = me ? [me, ...opponents] : opponents;
 
+  const myScore = me?.score ?? 0;
+  const bestOpponentScore = Math.max(...opponents.map((p) => p.score));
   const status =
     game.status === "finished"
-      ? (me?.score ?? 0) === (opponent?.score ?? 0)
+      ? myScore === bestOpponentScore
         ? "Égalité"
-        : (me?.score ?? 0) > (opponent?.score ?? 0)
+        : myScore > bestOpponentScore
           ? "Gagnée"
           : "Perdue"
       : null;
@@ -219,9 +523,9 @@ function GameRow({
     try {
       await remindOpponent(game.id);
       setRemindHidden(true);
-      onRemind({ message: `Rappel envoyé avec succès à ${opponent?.username ?? "l'adversaire"} !`, variant: "success" });
+      onRemind({ message: `Rappel envoyé avec succès à ${game.currentPlayerId} !`, variant: "success" });
     } catch {
-      onRemind({ message: `Échec de l'envoi du rappel à ${opponent?.username ?? "l'adversaire"}`, variant: "error" });
+      onRemind({ message: `Échec de l'envoi du rappel à ${game.currentPlayerId}`, variant: "error" });
     } finally {
       setReminding(false);
     }
@@ -236,7 +540,17 @@ function GameRow({
     <li className={`games-list__item${isMyTurn ? " games-list__item--active" : ""}`}>
       <button type="button" className="games-list__item-open" onClick={onOpen}>
         <span className="games-list__score">
-          {me?.score ?? 0} – {opponent?.score ?? 0}
+          {scoreRow.map((p, i) => (
+            <span key={p.username}>
+              {i > 0 && " – "}
+              <span
+                className={isThirdFor(game.players, username, p.username) ? "games-list__score-third" : undefined}
+                title={p.username === username ? "Vous" : p.username}
+              >
+                {p.score}
+              </span>
+            </span>
+          ))}
         </span>
         {status && <span className="games-list__status">{status}</span>}
       </button>
