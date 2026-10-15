@@ -7,7 +7,7 @@ interface TileProps {
   selected?: boolean;
   faded?: boolean;
   draggable?: boolean;
-  // Played by an opponent while this player was away from the game; the dot
+  // Placed by an opponent since this player's last turn; the dot
   // takes that opponent's color (blue for the third player in the viewer's order).
   unseen?: "accent" | "third";
   // Just sent off in a tile exchange: shrinks and fades out in place.

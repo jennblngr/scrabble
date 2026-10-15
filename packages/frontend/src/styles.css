@@ -867,7 +867,7 @@ body {
   100% { opacity: 1; transform: scale(1); }
 }
 
-/* Marks a tile played by the opponent while this player was away (see
+/* Marks a tile an opponent placed since this player's last turn (see
    unseenOpponentCells in Game.tsx). */
 .tile__unseen-dot {
   position: absolute;

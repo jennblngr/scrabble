@@ -173,11 +173,6 @@ export function Game({ username, gameId, onBack }: GameProps) {
   const [scoreAnim, setScoreAnim] = useState<ScoreAnim | null>(null);
   // "row,col" of each tile placed by the last move, used to halo the word on the board.
   const [waveCells, setWaveCells] = useState<Set<string>>(new Set());
-  // "row,col" of the opponent's last move, shown as a small red dot instead of
-  // the halo when that move is discovered on the very first game:state after
-  // (re)opening the game (i.e. it was played while this player was away), as
-  // opposed to a move seen live, which already gets the halo above.
-  const [unseenOpponentCells, setUnseenOpponentCells] = useState<Map<string, "accent" | "third">>(new Map());
   // Rack tiles mid-exchange: kept around (with their pre-exchange letter) so
   // they can shrink and fade out in their own slot instead of instantly
   // vanishing once the server's reply drops them from the rack.
@@ -207,7 +202,6 @@ export function Game({ username, gameId, onBack }: GameProps) {
     setPreview(null);
     setScoreAnim(null);
     setWaveCells(new Set());
-    setUnseenOpponentCells(new Map());
     hasReceivedStateRef.current = false;
     stateRef.current = null;
 
@@ -243,24 +237,6 @@ export function Game({ username, gameId, onBack }: GameProps) {
 
         setScoreAnim({ username: playerId, from, to, tileCount });
         setWaveCells(new Set(newCells.map((c) => `${c.row},${c.col}`)));
-        // This move (live or not) supersedes whatever the "while you were
-        // away" marker below was pointing at.
-        setUnseenOpponentCells(new Map());
-      }
-
-      // The very first game:state after (re)opening the game: whatever the
-      // opponents placed since this player's own last turn was necessarily
-      // played while they were away (a move played live gets the halo above
-      // instead), so mark it with a dot, in each author's color, rather than
-      // the halo/score animation.
-      if (!hasReceivedStateRef.current) {
-        const unseen = new Map<string, "accent" | "third">();
-        for (const move of movesSinceMine(s.recentMoves, username)) {
-          if (move.kind !== "place") continue;
-          const color = isThirdFor(s.players, username, move.username) ? "third" : "accent";
-          for (const c of move.cells) unseen.set(`${c.row},${c.col}`, color);
-        }
-        setUnseenOpponentCells(unseen);
       }
 
       // A state re-sent after a reconnect, where nothing was played, must not
@@ -304,9 +280,6 @@ export function Game({ username, gameId, onBack }: GameProps) {
       return;
     }
     getSocket().emit("game:preview", { gameId, tiles: pending });
-    // The player has started acting on the board, so the "while you were
-    // away" dot has served its purpose.
-    setUnseenOpponentCells(new Map());
   }, [pending, gameId]);
 
   const [errorFading, setErrorFading] = useState(false);
@@ -369,6 +342,21 @@ export function Game({ username, gameId, onBack }: GameProps) {
   const opponents = useMemo(() => (state ? playersFrom(state.players, username).slice(1) : []), [state, username]);
   const isMyTurn = state?.currentPlayerId === username;
   const players = state?.players ?? [];
+
+  // A dot, in each author's color, on every tile the others placed since my
+  // last turn: it stays while I arrange my own tiles and goes away once I
+  // validate my turn (place, pass or exchange), which makes my move the
+  // latest one. Derived from the state, so it also survives a reload.
+  const unseenOpponentCells = useMemo(() => {
+    const unseen = new Map<string, "accent" | "third">();
+    if (!state) return unseen;
+    for (const move of movesSinceMine(state.recentMoves, username)) {
+      if (move.kind !== "place") continue;
+      const color = isThirdFor(state.players, username, move.username) ? "third" : "accent";
+      for (const c of move.cells) unseen.set(`${c.row},${c.col}`, color);
+    }
+    return unseen;
+  }, [state, username]);
 
   // Blue instead of red on the board while it halos a move just played by
   // the third player in my view (see players.ts).
