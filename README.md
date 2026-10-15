@@ -33,7 +33,7 @@ Coller le hash obtenu dans `PLAYER1_PASSWORD_HASH` / `PLAYER2_PASSWORD_HASH` du 
 
 ### Inviter un joueur / mot de passe oublié
 
-Les autres joueurs (Estelle, par exemple) n'ont pas besoin d'être configurés dans le `.env` : depuis la liste des parties, le bouton « Inviter un joueur » (icône en haut) génère un lien à lui envoyer, sur lequel il choisit lui-même son mot de passe. Le même panneau, onglet « Mot de passe oublié », génère un lien pour choisir un nouveau mot de passe (y compris pour les 2 joueurs du `.env`, dont le hash est alors remplacé par celui enregistré en base).
+Les autres joueurs n'ont pas besoin d'être configurés dans le `.env` : depuis la liste des parties, le bouton « Inviter un joueur » (icône en haut) génère un lien à lui envoyer, sur lequel il choisit lui-même son mot de passe. Le même panneau, onglet « Mot de passe oublié », génère un lien pour choisir un nouveau mot de passe (y compris pour les 2 joueurs du `.env`, dont le hash est alors remplacé par celui enregistré en base).
 
 Les liens sont de la forme `https://…/#/invitation/<jeton>`, valables 7 jours et utilisables une seule fois ; seul un hash SHA-256 du jeton est stocké (table `invitations`), et les comptes créés vivent dans la table `accounts`. Seul un joueur connecté peut créer un lien.
 

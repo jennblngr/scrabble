@@ -342,7 +342,6 @@ function InvitePanel({ players, onClose }: { players: string[]; onClose: () => v
             onChange={(e) => setName(e.target.value)}
             maxLength={20}
             autoComplete="off"
-            placeholder="Estelle"
           />
         </label>
       ) : (
