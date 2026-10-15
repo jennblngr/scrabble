@@ -7,23 +7,7 @@ import { Toast, type ToastState } from "../components/Toast";
 import { isThirdSeat } from "../players";
 
 const REMINDER_DELAY_MS = 24 * 60 * 60 * 1000;
-const MAX_PLAYERS = 3;
-
-// Every way to pick 1 to MAX_PLAYERS - 1 opponents among `others`, smallest
-// games first (e.g. [Bob], [Estelle], [Bob, Estelle]).
-function opponentChoices(others: string[]): string[][] {
-  const choices: string[][] = [[]];
-  for (const other of others) {
-    for (const choice of [...choices]) choices.push([...choice, other]);
-  }
-  return choices
-    .filter((c) => c.length >= 1 && c.length <= MAX_PLAYERS - 1)
-    .sort((a, b) => a.length - b.length);
-}
-
-function joinNames(names: string[]): string {
-  return names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`;
-}
+const PLAYER_COUNTS = [2, 3];
 
 interface GamesListProps {
   username: string;
@@ -55,8 +39,6 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
       });
   }, [username]);
 
-  const choices = opponentChoices(otherPlayers);
-
   // Reprendre l'app depuis l'arrière-plan (PWA remise au premier plan, onglet
   // réactivé, retour depuis le cache de navigation) ne remonte pas ce
   // composant : sans ça, la liste resterait figée tant qu'on ne force pas un
@@ -73,16 +55,7 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
     };
   }, []);
 
-  function handleNewGameClick() {
-    // A single possible opponent: nothing to choose, start right away.
-    if (choices.length <= 1) {
-      handleCreate(choices[0]);
-    } else {
-      setChoosing((v) => !v);
-    }
-  }
-
-  async function handleCreate(opponents?: string[]) {
+  async function handleCreate(opponents: string[]) {
     setError(null);
     setCreating(true);
     try {
@@ -138,29 +111,15 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
       <button
         type="button"
         className="games-list__new"
-        onClick={handleNewGameClick}
+        onClick={() => setChoosing((v) => !v)}
         disabled={creating}
-        aria-expanded={choices.length > 1 ? choosing : undefined}
+        aria-expanded={choosing}
       >
-        {creating ? "Création..." : choosing ? "Annuler" : "+ Nouvelle partie"}
+        {choosing ? "Annuler" : "+ Nouvelle partie"}
       </button>
 
       {choosing && (
-        <ul className="games-list__choices">
-          {choices.map((opponents) => (
-            <li key={opponents.join("|")}>
-              <button
-                type="button"
-                className="games-list__choice"
-                onClick={() => handleCreate(opponents)}
-                disabled={creating}
-              >
-                <span>Avec {joinNames(opponents)}</span>
-                <span className="games-list__choice-count">{opponents.length + 1} joueurs</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <NewGameForm otherPlayers={otherPlayers} creating={creating} onStart={handleCreate} />
       )}
 
       {games === null ? (
@@ -235,6 +194,101 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
 
       <Toast toast={toast} onDismiss={() => setToast(null)} />
     </div>
+  );
+}
+
+function NewGameForm({
+  otherPlayers,
+  creating,
+  onStart,
+}: {
+  otherPlayers: string[];
+  creating: boolean;
+  onStart: (opponents: string[]) => void;
+}) {
+  const [playerCount, setPlayerCount] = useState(2);
+  const [selected, setSelected] = useState<string[]>([]);
+  const opponentCount = playerCount - 1;
+
+  function chooseCount(count: number) {
+    setPlayerCount(count);
+    // With exactly as many accounts as seats, there is nobody to pick.
+    setSelected((prev) => (otherPlayers.length === count - 1 ? otherPlayers : prev.slice(0, count - 1)));
+  }
+
+  function togglePlayer(name: string) {
+    setSelected((prev) => {
+      if (prev.includes(name)) return prev.filter((n) => n !== name);
+      // A single opponent to pick behaves like a radio choice.
+      if (opponentCount === 1) return [name];
+      return prev.length < opponentCount ? [...prev, name] : prev;
+    });
+  }
+
+  const ready = selected.length === opponentCount;
+
+  return (
+    <form
+      className="new-game"
+      onSubmit={(e) => {
+        e.preventDefault();
+        // Keep the accounts' order, which is also the order of play.
+        if (ready) onStart(otherPlayers.filter((p) => selected.includes(p)));
+      }}
+    >
+      <fieldset className="new-game__step">
+        <legend>Nombre de joueurs</legend>
+        <div className="new-game__counts">
+          {PLAYER_COUNTS.map((count) => (
+            <button
+              key={count}
+              type="button"
+              className="new-game__count"
+              aria-pressed={playerCount === count}
+              disabled={count - 1 > otherPlayers.length}
+              onClick={() => chooseCount(count)}
+            >
+              {count} joueurs
+            </button>
+          ))}
+        </div>
+      </fieldset>
+
+      <fieldset className="new-game__step">
+        <legend>
+          {opponentCount === 1 ? "Choisis ton adversaire" : `Choisis tes ${opponentCount} adversaires`}
+        </legend>
+        <ul className="new-game__players">
+          {otherPlayers.map((name) => {
+            const isSelected = selected.includes(name);
+            return (
+              <li key={name}>
+                <button
+                  type="button"
+                  className="new-game__player"
+                  aria-pressed={isSelected}
+                  disabled={!isSelected && opponentCount > 1 && selected.length >= opponentCount}
+                  onClick={() => togglePlayer(name)}
+                >
+                  <span>{name}</span>
+                  <span className="new-game__check" aria-hidden="true">
+                    {isSelected && (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                    )}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </fieldset>
+
+      <button type="submit" className="new-game__start" disabled={!ready || creating}>
+        {creating ? "Création..." : "Commencer la partie"}
+      </button>
+    </form>
   );
 }
 

@@ -1078,45 +1078,118 @@ body {
   cursor: default;
 }
 
-.games-list__choices {
-  list-style: none;
+.new-game {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
   margin: 8px 0 4px;
+  padding: 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+
+.new-game__step {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.new-game__step legend {
+  padding: 0;
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.new-game__counts {
+  display: flex;
+  gap: 8px;
+}
+
+.new-game__count,
+.new-game__player {
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.new-game__count {
+  flex: 1;
+  padding: 10px 12px;
+}
+
+.new-game__count[aria-pressed="true"],
+.new-game__player[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft-bg);
+}
+
+.new-game__count:disabled,
+.new-game__player:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.new-game__players {
+  list-style: none;
+  margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 
-.games-list__choice {
+.new-game__player {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
   width: 100%;
   padding: 10px 12px;
-  border-radius: 8px;
+  text-align: left;
+}
+
+.new-game__check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
   border: 1px solid var(--color-border);
-  background: var(--color-bg-elevated);
-  color: var(--color-text);
+  color: var(--color-accent-contrast);
+}
+
+.new-game__player[aria-pressed="true"] .new-game__check {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+}
+
+.new-game__start {
+  padding: 12px;
+  border-radius: 8px;
+  border: none;
+  background: var(--color-accent);
+  color: var(--color-accent-contrast);
   font: inherit;
   font-weight: 600;
-  text-align: left;
+  font-size: 0.95rem;
   cursor: pointer;
 }
 
-.games-list__choice:hover {
-  border-color: var(--color-accent);
-}
-
-.games-list__choice:disabled {
-  opacity: 0.5;
+.new-game__start:disabled {
+  background: var(--color-disabled-bg);
+  color: var(--color-disabled-text);
   cursor: default;
-}
-
-.games-list__choice-count {
-  font-size: 0.8rem;
-  font-weight: 400;
-  opacity: 0.75;
 }
 
 .games-list__empty {

@@ -31,7 +31,7 @@ node packages/backend/scripts/hash-password.mjs "motdepasse"
 
 Coller le hash obtenu dans `PLAYER1_PASSWORD_HASH` / `PLAYER2_PASSWORD_HASH` du `.env`. Les pseudos (`PLAYER1_USERNAME` / `PLAYER2_USERNAME`) sont aussi affichés comme choix rapides sur la page de connexion, via `GET /api/auth/players`.
 
-Le troisième joueur (Estelle) est optionnel : renseigner `PLAYER3_USERNAME` et `PLAYER3_PASSWORD_HASH` pour l'activer, ou laisser `PLAYER3_USERNAME` vide pour rester à 2. Avec 3 comptes, « Nouvelle partie » propose de choisir ses adversaires (une partie à 2 avec l'un ou l'autre, ou à 3). L'ordre de jeu suit l'ordre des comptes (joueur 1, 2, puis 3), et le troisième joueur d'une partie à 3 est signalé en bleu au lieu du rouge. Chaque joueur ne voit que les parties auxquelles il participe.
+Le troisième joueur (Estelle) est optionnel : renseigner `PLAYER3_USERNAME` et `PLAYER3_PASSWORD_HASH` pour l'activer, ou laisser `PLAYER3_USERNAME` vide pour rester à 2. « Nouvelle partie » ouvre un formulaire : choisir 2 ou 3 joueurs, puis ses adversaires, avant de lancer la partie avec « Commencer la partie ». L'ordre de jeu suit l'ordre des comptes (joueur 1, 2, puis 3), et le troisième joueur d'une partie à 3 est signalé en bleu au lieu du rouge. Chaque joueur ne voit que les parties auxquelles il participe.
 
 ### Générer les clés VAPID (notifications push)
 
