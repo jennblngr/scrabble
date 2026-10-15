@@ -105,7 +105,7 @@ function moveKey(move: RecentMove): string {
 }
 
 function MoveSummary({ move, isMe, third }: { move: RecentMove; isMe: boolean; third: boolean }) {
-  const who = <strong>{isMe ? "Vous" : move.username}</strong>;
+  const who = <strong className={third ? "game__status-name--third" : undefined}>{isMe ? "Vous" : move.username}</strong>;
   if (move.kind === "pass") {
     return (
       <>

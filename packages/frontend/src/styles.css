@@ -519,7 +519,8 @@ body {
   color: var(--color-accent);
 }
 
-.game__status-word--third {
+.game__status-word--third,
+.game__status-name--third {
   color: var(--color-accent-third);
 }
 
