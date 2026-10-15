@@ -19,7 +19,7 @@ nginx/scrabble.conf       config nginx à installer sur le VPS (reverse proxy + 
 1. Copier `.env.example` en `.env` et remplir les valeurs (voir ci-dessous pour les mots de passe et les clés VAPID).
 2. Lancer Postgres : `docker compose up -d`
 3. Installer les dépendances : `npm install` (à la racine, npm workspaces gère les 3 packages)
-4. Appliquer le schéma : `npm run db:migrate`
+4. Appliquer le schéma : `npm run db:migrate` (facultatif : le backend l'applique aussi à chaque démarrage, le schéma étant idempotent)
 5. Lancer le backend : `npm run dev:backend` (port 4000)
 6. Lancer le frontend : `npm run dev:frontend` (Vite proxy `/api` et `/socket.io` vers le backend)
 

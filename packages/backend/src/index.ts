@@ -1,6 +1,7 @@
 import Fastify from "fastify";
 import { config } from "./config.js";
 import { allPlayers, loadAccounts } from "./accounts.js";
+import { applySchema } from "./db/schema.js";
 import { registerAuth, getUsernameFromRequest } from "./auth/auth.js";
 import { createNewGame, listGames, loadGame, markReminded, deleteGame } from "./game/store.js";
 import { MAX_PLAYERS } from "./game/gameEngine.js";
@@ -9,6 +10,8 @@ import { setupSocket } from "./socket/index.js";
 
 const app = Fastify({ logger: true });
 
+// Before anything reads the database (loadAccounts below).
+await applySchema();
 await loadAccounts();
 await registerAuth(app);
 
