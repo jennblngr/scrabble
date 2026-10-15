@@ -375,7 +375,8 @@ body {
 }
 
 .scores__col {
-  /* Per-player accent: red, or blue for the third seat (--third below). */
+  /* Per-player accent: red, or blue for the third player as the viewer sees
+     them (--third below, see players.ts). */
   --player-accent: var(--color-accent);
   flex: 1;
   min-width: 0;
@@ -524,7 +525,7 @@ body {
   color: var(--color-accent-third);
 }
 
-/* While the board halos a move just played by the third seat, its accent
+/* While the board halos a move just played by the viewer's third player, its accent
    turns blue. */
 .game__board-area--third {
   --color-accent: var(--color-accent-third);

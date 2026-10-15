@@ -6,7 +6,7 @@ import { ZoomableBoard } from "../components/ZoomableBoard";
 import { Rack } from "../components/Rack";
 import { Tile } from "../components/Tile";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { isThirdSeat } from "../players";
+import { isThirdFor, playersFrom } from "../players";
 import { Ticker } from "../components/Ticker";
 
 interface GameProps {
@@ -257,7 +257,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
         const unseen = new Map<string, "accent" | "third">();
         for (const move of movesSinceMine(s.recentMoves, username)) {
           if (move.kind !== "place") continue;
-          const color = isThirdSeat(s.players, move.username) ? "third" : "accent";
+          const color = isThirdFor(s.players, username, move.username) ? "third" : "accent";
           for (const c of move.cells) unseen.set(`${c.row},${c.col}`, color);
         }
         setUnseenOpponentCells(unseen);
@@ -364,14 +364,15 @@ export function Game({ username, gameId, onBack }: GameProps) {
   }, [bagBlink]);
 
   const me = useMemo(() => state?.players.find((p) => p.username === username) ?? null, [state, username]);
-  // In turn order, so the score columns read in the order players take turns.
-  const opponents = useMemo(() => state?.players.filter((p) => p.username !== username) ?? [], [state, username]);
+  // In turn order starting after me, so the score columns read in the order
+  // players take turns from my point of view.
+  const opponents = useMemo(() => (state ? playersFrom(state.players, username).slice(1) : []), [state, username]);
   const isMyTurn = state?.currentPlayerId === username;
   const players = state?.players ?? [];
 
   // Blue instead of red on the board while it halos a move just played by
-  // the third seat of a 3-player game.
-  const boardShowsThirdSeatMove = !!scoreAnim && isThirdSeat(players, scoreAnim.username);
+  // the third player in my view (see players.ts).
+  const boardShowsThirdSeatMove = !!scoreAnim && isThirdFor(players, username, scoreAnim.username);
 
   // Header summary: everything the others did since my last turn (so with 3
   // players, both opponents' moves), or else my own last move.
@@ -394,7 +395,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
                   ·
                 </span>
               )}
-              <MoveSummary move={move} isMe={move.username === username} third={isThirdSeat(players, move.username)} />
+              <MoveSummary move={move} isMe={move.username === username} third={isThirdFor(players, username, move.username)} />
             </span>
           )),
     [statusMoves, username, players]
@@ -721,7 +722,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
               label={player === me ? "Vous" : player.username}
               align={i === 0 ? "left" : i === all.length - 1 ? "right" : "center"}
               active={state.currentPlayerId === player.username}
-              third={isThirdSeat(state.players, player.username)}
+              third={isThirdFor(state.players, username, player.username)}
               anim={scoreAnim?.username === player.username ? scoreAnim : null}
             />
           ) : null

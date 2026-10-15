@@ -37,7 +37,7 @@ Les autres joueurs (Estelle, par exemple) n'ont pas besoin d'être configurés d
 
 Les liens sont de la forme `https://…/#/invitation/<jeton>`, valables 7 jours et utilisables une seule fois ; seul un hash SHA-256 du jeton est stocké (table `invitations`), et les comptes créés vivent dans la table `accounts`. Seul un joueur connecté peut créer un lien.
 
-« Nouvelle partie » ouvre un formulaire : choisir 2 ou 3 joueurs, puis ses adversaires, avant de lancer la partie avec « Commencer la partie ». L'ordre de jeu suit l'ordre des comptes (les 2 joueurs du `.env`, puis les invités par ordre d'arrivée), et le troisième joueur d'une partie à 3 est signalé en bleu au lieu du rouge. Chaque joueur ne voit que les parties auxquelles il participe.
+« Nouvelle partie » ouvre un formulaire : choisir 2 ou 3 joueurs, puis ses adversaires, avant de lancer la partie avec « Commencer la partie ». L'ordre de jeu suit l'ordre des comptes (les 2 joueurs du `.env`, puis les invités par ordre d'arrivée), et dans une partie à 3, les couleurs dépendent du joueur connecté : lui et le joueur suivant restent en rouge, le troisième (celui qui joue juste avant lui) est en bleu. Chaque joueur ne voit que les parties auxquelles il participe.
 
 ### Générer les clés VAPID (notifications push)
 

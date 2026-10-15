@@ -4,7 +4,7 @@ import { listGames, createGame, remindOpponent, deleteGame } from "../api/games"
 import { logout, players as fetchPlayers } from "../api/auth";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { Toast, type ToastState } from "../components/Toast";
-import { isThirdSeat } from "../players";
+import { isThirdFor, playersFrom } from "../players";
 import { createInvitation, invitationUrl, type InvitationKind } from "../api/invitations";
 
 const REMINDER_DELAY_MS = 24 * 60 * 60 * 1000;
@@ -493,9 +493,9 @@ function GameRow({
   const [remindHidden, setRemindHidden] = useState(false);
 
   const me = game.players.find((p) => p.username === username);
-  const opponents = game.players.filter((p) => p.username !== username);
+  const opponents = playersFrom(game.players, username).slice(1);
   const isMyTurn = game.status !== "finished" && game.currentPlayerId === username;
-  // Me first, then the others in turn order.
+  // Me first, then the others in turn order starting after me.
   const scoreRow = me ? [me, ...opponents] : opponents;
 
   const myScore = me?.score ?? 0;
@@ -545,7 +545,7 @@ function GameRow({
             <span key={p.username}>
               {i > 0 && " – "}
               <span
-                className={isThirdSeat(game.players, p.username) ? "games-list__score-third" : undefined}
+                className={isThirdFor(game.players, username, p.username) ? "games-list__score-third" : undefined}
                 title={p.username === username ? "Vous" : p.username}
               >
                 {p.score}
