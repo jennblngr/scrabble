@@ -589,6 +589,18 @@ body {
 }
 
 .board-viewport {
+  /* Board text (bonus labels, tile letters and values) is sized in cqw, i.e.
+     relative to the board's own width, so it keeps the same proportions on
+     every screen. Calibrated so a 390px-wide phone (board ~327px) matches the
+     original fixed sizes. Zooming scales the board with a transform, which
+     leaves these layout sizes untouched, so text zooms along with the cells. */
+  container-type: inline-size;
+  --board-bonus-font: 2.7cqw;
+  --board-center-font: 3.4cqw;
+  --board-letter-font: 4.9cqw;
+  --board-value-font: 2.2cqw;
+  --board-dot-size: 1.8cqw;
+  --board-dot-inset: 0.6cqw;
   position: relative;
   width: 100%;
   max-width: 100%;
@@ -740,15 +752,15 @@ body {
 
 .board__cell--empty {
   background: var(--board-cell-empty-bg);
-  font-size: 0.55rem;
+  font-size: var(--board-bonus-font);
   font-weight: 700;
 }
 
-.board__cell--TW { background: var(--board-mt-bg); color: var(--board-mt-text); font-size: 0.55rem; font-weight: 700; }
-.board__cell--DW { background: var(--board-md-bg); color: var(--board-md-text); font-size: 0.55rem; font-weight: 700; }
-.board__cell--TL { background: var(--board-lt-bg); color: var(--board-lt-text); font-size: 0.55rem; font-weight: 700; }
-.board__cell--DL { background: var(--board-ld-bg); color: var(--board-ld-text); font-size: 0.55rem; font-weight: 700; }
-.board__cell--CENTER { background: var(--board-md-bg); color: var(--board-md-text); font-size: 0.7rem; font-weight: 700; }
+.board__cell--TW { background: var(--board-mt-bg); color: var(--board-mt-text); font-size: var(--board-bonus-font); font-weight: 700; }
+.board__cell--DW { background: var(--board-md-bg); color: var(--board-md-text); font-size: var(--board-bonus-font); font-weight: 700; }
+.board__cell--TL { background: var(--board-lt-bg); color: var(--board-lt-text); font-size: var(--board-bonus-font); font-weight: 700; }
+.board__cell--DL { background: var(--board-ld-bg); color: var(--board-ld-text); font-size: var(--board-bonus-font); font-weight: 700; }
+.board__cell--CENTER { background: var(--board-md-bg); color: var(--board-md-text); font-size: var(--board-center-font); font-weight: 700; }
 
 .rack {
   display: flex;
@@ -808,7 +820,7 @@ body {
   width: 100%;
   height: 100%;
   border-radius: 0;
-  font-size: 1rem;
+  font-size: var(--board-letter-font);
   box-shadow: none;
 }
 
@@ -859,10 +871,10 @@ body {
    unseenOpponentCells in Game.tsx). */
 .tile__unseen-dot {
   position: absolute;
-  top: 2px;
-  right: 2px;
-  width: 6px;
-  height: 6px;
+  top: var(--board-dot-inset);
+  right: var(--board-dot-inset);
+  width: var(--board-dot-size);
+  height: var(--board-dot-size);
   border-radius: 50%;
   background: var(--color-accent);
 }
@@ -1004,7 +1016,7 @@ body {
 .board .tile__value {
   bottom: -1px;
   right: 1px;
-  font-size: 0.45rem;
+  font-size: var(--board-value-font);
 }
 
 .game__actions {
