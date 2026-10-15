@@ -45,6 +45,19 @@ export interface LastMove {
   cells: { row: number; col: number }[];
 }
 
+/** Any kind of turn, as shown in the "since your last turn" summary. */
+export interface RecentMove {
+  username: string;
+  kind: "place" | "pass" | "exchange";
+  /** Words formed (place only). */
+  words: string[];
+  score: number;
+  /** Board cells the move placed a letter on (place only). */
+  cells: { row: number; col: number }[];
+  /** Number of tiles placed or exchanged. */
+  tileCount: number;
+}
+
 export interface GameState {
   id: string;
   status: GameStatus;
@@ -55,6 +68,12 @@ export interface GameState {
   currentPlayerId: string;
   consecutivePasses: number;
   lastMove: LastMove | null;
+  /**
+   * The latest turns of any kind, oldest first: at most one fewer than the
+   * number of players, i.e. enough to cover everything the others played
+   * since a player's own last turn.
+   */
+  recentMoves: RecentMove[];
   createdAt: string;
   updatedAt: string;
 }

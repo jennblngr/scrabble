@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
-import type { GameState, MoveResult, PlacedTile, Player, RackTile } from "@scrabble/shared";
+import type { GameState, MoveResult, PlacedTile, Player, RackTile, RecentMove } from "@scrabble/shared";
 import { getSocket } from "../api/socket";
 import { subscribeToPush } from "../push";
 import { ZoomableBoard } from "../components/ZoomableBoard";
@@ -7,6 +7,7 @@ import { Rack } from "../components/Rack";
 import { Tile } from "../components/Tile";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { isThirdSeat } from "../players";
+import { Ticker } from "../components/Ticker";
 
 interface GameProps {
   username: string;
@@ -93,6 +94,41 @@ function useDisplayedScore(value: number, anim: ScoreAnim | null) {
   return display;
 }
 
+/** What the others played since `username`'s own last turn, oldest first. */
+function movesSinceMine(recentMoves: RecentMove[], username: string): RecentMove[] {
+  const lastMine = recentMoves.map((m) => m.username).lastIndexOf(username);
+  return recentMoves.slice(lastMine + 1);
+}
+
+function moveKey(move: RecentMove): string {
+  return `${move.username}:${move.kind}:${move.words.join("+")}:${move.score}:${move.tileCount}`;
+}
+
+function MoveSummary({ move, isMe, third }: { move: RecentMove; isMe: boolean; third: boolean }) {
+  const who = <strong>{isMe ? "Vous" : move.username}</strong>;
+  if (move.kind === "pass") {
+    return (
+      <>
+        {who} {isMe ? "avez passé votre" : "a passé son"} tour
+      </>
+    );
+  }
+  if (move.kind === "exchange") {
+    return (
+      <>
+        {who} {isMe ? "avez" : "a"} échangé {move.tileCount} lettre{move.tileCount > 1 ? "s" : ""}
+      </>
+    );
+  }
+  return (
+    <>
+      {who} {isMe ? "avez" : "a"} joué{" "}
+      <strong className={`game__status-word${third ? " game__status-word--third" : ""}`}>{move.words.join(" + ")}</strong>{" "}
+      pour <strong>{move.score} points</strong>
+    </>
+  );
+}
+
 function ScoreColumn({
   player,
   label,
@@ -141,7 +177,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
   // the halo when that move is discovered on the very first game:state after
   // (re)opening the game (i.e. it was played while this player was away), as
   // opposed to a move seen live, which already gets the halo above.
-  const [unseenOpponentCells, setUnseenOpponentCells] = useState<Set<string>>(new Set());
+  const [unseenOpponentCells, setUnseenOpponentCells] = useState<Map<string, "accent" | "third">>(new Map());
   // Rack tiles mid-exchange: kept around (with their pre-exchange letter) so
   // they can shrink and fade out in their own slot instead of instantly
   // vanishing once the server's reply drops them from the rack.
@@ -171,7 +207,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
     setPreview(null);
     setScoreAnim(null);
     setWaveCells(new Set());
-    setUnseenOpponentCells(new Set());
+    setUnseenOpponentCells(new Map());
     hasReceivedStateRef.current = false;
     stateRef.current = null;
 
@@ -209,15 +245,22 @@ export function Game({ username, gameId, onBack }: GameProps) {
         setWaveCells(new Set(newCells.map((c) => `${c.row},${c.col}`)));
         // This move (live or not) supersedes whatever the "while you were
         // away" marker below was pointing at.
-        setUnseenOpponentCells(new Set());
+        setUnseenOpponentCells(new Map());
       }
 
-      // The very first game:state after (re)opening the game: if the last
-      // move on the board belongs to the opponent, it was necessarily played
-      // while this player was away (a move played live gets the halo above
-      // instead), so mark it with a dot rather than the halo/score animation.
-      if (!hasReceivedStateRef.current && s.lastMove && s.lastMove.username !== username) {
-        setUnseenOpponentCells(new Set(s.lastMove.cells.map((c) => `${c.row},${c.col}`)));
+      // The very first game:state after (re)opening the game: whatever the
+      // opponents placed since this player's own last turn was necessarily
+      // played while they were away (a move played live gets the halo above
+      // instead), so mark it with a dot, in each author's color, rather than
+      // the halo/score animation.
+      if (!hasReceivedStateRef.current) {
+        const unseen = new Map<string, "accent" | "third">();
+        for (const move of movesSinceMine(s.recentMoves, username)) {
+          if (move.kind !== "place") continue;
+          const color = isThirdSeat(s.players, move.username) ? "third" : "accent";
+          for (const c of move.cells) unseen.set(`${c.row},${c.col}`, color);
+        }
+        setUnseenOpponentCells(unseen);
       }
 
       // A state re-sent after a reconnect, where nothing was played, must not
@@ -263,7 +306,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
     getSocket().emit("game:preview", { gameId, tiles: pending });
     // The player has started acting on the board, so the "while you were
     // away" dot has served its purpose.
-    setUnseenOpponentCells(new Set());
+    setUnseenOpponentCells(new Map());
   }, [pending, gameId]);
 
   const [errorFading, setErrorFading] = useState(false);
@@ -326,29 +369,36 @@ export function Game({ username, gameId, onBack }: GameProps) {
   const isMyTurn = state?.currentPlayerId === username;
   const players = state?.players ?? [];
 
-  // Blue instead of red on the board while it highlights a move by the third
-  // seat of a 3-player game: the just-played halo, or the "while you were
-  // away" dots.
-  const boardShowsThirdSeatMove =
-    (!!scoreAnim && isThirdSeat(players, scoreAnim.username)) ||
-    (unseenOpponentCells.size > 0 && isThirdSeat(players, state?.lastMove?.username));
+  // Blue instead of red on the board while it halos a move just played by
+  // the third seat of a 3-player game.
+  const boardShowsThirdSeatMove = !!scoreAnim && isThirdSeat(players, scoreAnim.username);
 
-  const lastMoveText = useMemo(() => {
-    const lastMove = state?.lastMove;
-    if (!lastMove) return null;
-    const isMe = lastMove.username === username;
-    const third = isThirdSeat(state.players, lastMove.username);
-    return (
-      <>
-        <strong>{isMe ? "Vous" : lastMove.username}</strong> {isMe ? "avez" : "a"} joué{" "}
-        <strong className={`game__status-word${third ? " game__status-word--third" : ""}`}>
-          {lastMove.words.join(" + ")}
-        </strong>{" "}
-        pour{" "}
-        <strong>{lastMove.score} points</strong>
-      </>
-    );
+  // Header summary: everything the others did since my last turn (so with 3
+  // players, both opponents' moves), or else my own last move.
+  const statusMoves = useMemo(() => {
+    if (!state) return [];
+    const since = movesSinceMine(state.recentMoves, username);
+    if (since.length > 0) return since;
+    const last = state.recentMoves[state.recentMoves.length - 1];
+    return last ? [last] : [];
   }, [state, username]);
+
+  const statusMovesText = useMemo(
+    () =>
+      statusMoves.length === 0
+        ? null
+        : statusMoves.map((move, i) => (
+            <span key={i}>
+              {i > 0 && (
+                <span className="game__status-separator" aria-hidden="true">
+                  ·
+                </span>
+              )}
+              <MoveSummary move={move} isMe={move.username === username} third={isThirdSeat(players, move.username)} />
+            </span>
+          )),
+    [statusMoves, username, players]
+  );
 
   useEffect(() => {
     if (!me) return;
@@ -636,11 +686,13 @@ export function Game({ username, gameId, onBack }: GameProps) {
         <div
           className={`game__status${error ? ` game__status--error${errorFading ? " game__status--error-fading" : ""}` : ""}`}
         >
-          {error
-            ? error
-            : state.status === "finished"
+          {error ? (
+            error
+          ) : (
+            <Ticker contentKey={`${state.status}|${state.currentPlayerId}|${statusMoves.map(moveKey).join("|")}`}>
+              {state.status === "finished"
             ? "Partie terminée"
-            : lastMoveText ??
+            : statusMovesText ??
               (isMyTurn ? (
                 <>
                   À <strong>toi</strong> de jouer
@@ -652,6 +704,8 @@ export function Game({ username, gameId, onBack }: GameProps) {
               ) : (
                 "En attente de l'adversaire"
               ))}
+            </Ticker>
+          )}
         </div>
         <div className="game__header-actions">
           <ThemeToggle />

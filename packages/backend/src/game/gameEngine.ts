@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import type { Board, GameState, LastMove, MoveResult, PlacedTile, Player, RackTile } from "@scrabble/shared";
+import type { Board, GameState, LastMove, MoveResult, PlacedTile, Player, RackTile, RecentMove } from "@scrabble/shared";
 import { createEmptyBoard } from "./board.js";
 import { createBag, fillRack, LETTER_VALUES, RACK_SIZE } from "./tiles.js";
 import { MoveError, validateAndExtractWords } from "./rules.js";
@@ -21,6 +21,7 @@ export interface InternalGame {
   currentPlayerId: string;
   consecutivePasses: number;
   lastMove: LastMove | null;
+  recentMoves: RecentMove[];
   isFirstMove: boolean;
   createdAt: string;
   updatedAt: string;
@@ -50,6 +51,7 @@ export function createGame(usernames: string[]): InternalGame {
     currentPlayerId: usernames[0],
     consecutivePasses: 0,
     lastMove: null,
+    recentMoves: [],
     isFirstMove: true,
     createdAt: now,
     updatedAt: now,
@@ -67,6 +69,7 @@ export function toPublicState(game: InternalGame): GameState {
     currentPlayerId: game.currentPlayerId,
     consecutivePasses: game.consecutivePasses,
     lastMove: game.lastMove,
+    recentMoves: game.recentMoves,
     createdAt: game.createdAt,
     updatedAt: game.updatedAt,
   };
@@ -79,6 +82,15 @@ function requireTurn(game: InternalGame, username: string) {
 
 function currentPlayer(game: InternalGame, username: string): Player {
   return game.players.find((p) => p.username === username)!;
+}
+
+/** Number of turns kept in recentMoves: one per other player. */
+export function recentMovesLimit(playerCount: number): number {
+  return Math.max(playerCount - 1, 1);
+}
+
+function pushRecentMove(game: InternalGame, move: RecentMove) {
+  game.recentMoves = [...game.recentMoves, move].slice(-recentMovesLimit(game.players.length));
 }
 
 function advanceTurn(game: InternalGame) {
@@ -145,6 +157,7 @@ export function applyPlace(game: InternalGame, username: string, placed: PlacedT
     score: result.totalScore,
     cells: placed.map((t) => ({ row: t.row, col: t.col })),
   };
+  pushRecentMove(game, { ...game.lastMove, kind: "place", tileCount: placed.length });
 
   if (game.bag.length === 0 && player.rack.length === 0) {
     finishGameEarly(game, player.username);
@@ -158,6 +171,7 @@ export function applyPlace(game: InternalGame, username: string, placed: PlacedT
 
 export function applyPass(game: InternalGame, username: string) {
   requireTurn(game, username);
+  pushRecentMove(game, { username, kind: "pass", words: [], score: 0, cells: [], tileCount: 0 });
   game.consecutivePasses += 1;
   if (tooManyNonPlays(game)) {
     finishGameByExhaustion(game);
@@ -189,6 +203,7 @@ export function applyExchange(game: InternalGame, username: string, rackTileIds:
 
   player.rack = rack;
   game.bag = bag;
+  pushRecentMove(game, { username, kind: "exchange", words: [], score: 0, cells: [], tileCount: rackTileIds.length });
   game.consecutivePasses += 1;
 
   if (tooManyNonPlays(game)) {

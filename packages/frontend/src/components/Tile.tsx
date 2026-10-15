@@ -7,8 +7,9 @@ interface TileProps {
   selected?: boolean;
   faded?: boolean;
   draggable?: boolean;
-  // Played by the opponent while this player was away from the game.
-  unseen?: boolean;
+  // Played by an opponent while this player was away from the game; the dot
+  // takes that opponent's color (blue for the third seat of a 3-player game).
+  unseen?: "accent" | "third";
   // Just sent off in a tile exchange: shrinks and fades out in place.
   exchanging?: boolean;
   // Just swapped into a slot an exchanged tile vacated: grows and fades in.
@@ -54,7 +55,9 @@ export function Tile({
     >
       <span className="tile__letter">{letter}</span>
       {!isBlank && <span className="tile__value">{value}</span>}
-      {unseen && <span className="tile__unseen-dot" aria-hidden="true" />}
+      {unseen && (
+        <span className={`tile__unseen-dot${unseen === "third" ? " tile__unseen-dot--third" : ""}`} aria-hidden="true" />
+      )}
     </button>
   );
 }

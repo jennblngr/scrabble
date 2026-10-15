@@ -478,6 +478,43 @@ body {
   overflow-wrap: break-word;
 }
 
+/* See components/Ticker.tsx. */
+.ticker {
+  overflow: hidden;
+  white-space: nowrap;
+  text-align: center;
+}
+
+.ticker__content {
+  display: inline-block;
+  will-change: transform;
+}
+
+/* Scrolling: start from the left edge, and soften both edges so the text
+   reads as sliding under them rather than being cut. */
+.ticker--scrolling {
+  text-align: left;
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 8px, #000 calc(100% - 12px), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 8px, #000 calc(100% - 12px), transparent);
+}
+
+.ticker--scrolling .ticker__content {
+  padding: 0 12px 0 8px;
+}
+
+.ticker--wrap {
+  white-space: normal;
+}
+
+.ticker--wrap .ticker__content {
+  display: inline;
+}
+
+.game__status-separator {
+  margin: 0 0.6em;
+  opacity: 0.6;
+}
+
 .game__status-word {
   color: var(--color-accent);
 }
@@ -486,8 +523,8 @@ body {
   color: var(--color-accent-third);
 }
 
-/* While the board highlights a move by the third seat (just-played halo,
-   "while you were away" dots), its accent turns blue. */
+/* While the board halos a move just played by the third seat, its accent
+   turns blue. */
 .game__board-area--third {
   --color-accent: var(--color-accent-third);
   --color-accent-soft-bg: var(--color-accent-third-soft-bg);
@@ -826,6 +863,10 @@ body {
   height: 6px;
   border-radius: 50%;
   background: var(--color-accent);
+}
+
+.tile__unseen-dot--third {
+  background: var(--color-accent-third);
 }
 
 /* Validated state: the dashed layers cross-fade into the filled ones, so the

@@ -1,6 +1,6 @@
 import { pool } from "../db/pool.js";
 import type { GameSummary } from "@scrabble/shared";
-import { createGame, type InternalGame } from "./gameEngine.js";
+import { createGame, recentMovesLimit, type InternalGame } from "./gameEngine.js";
 
 const cache = new Map<string, InternalGame>();
 
@@ -75,6 +75,27 @@ export async function loadGame(id: string): Promise<InternalGame> {
   );
   const lastMoveRow = lastMoveRows[0];
 
+  const { rows: recentRows } = await pool.query(
+    `SELECT username, kind, words, score, tiles FROM moves WHERE game_id = $1 ORDER BY created_at DESC LIMIT $2`,
+    [id, recentMovesLimit(players.length)]
+  );
+  const recentMoves: InternalGame["recentMoves"] = recentRows.reverse().map((m) => {
+    // tiles holds the placed tiles for a place, the exchanged rack tile ids
+    // for an exchange, and null for a pass.
+    const tiles = (m.tiles ?? []) as unknown[];
+    return {
+      username: m.username,
+      kind: m.kind,
+      words: m.kind === "place" ? (m.words as { word: string }[]).map((w) => w.word) : [],
+      score: m.score,
+      cells:
+        m.kind === "place"
+          ? (tiles as { row: number; col: number }[]).map((t) => ({ row: t.row, col: t.col }))
+          : [],
+      tileCount: tiles.length,
+    };
+  });
+
   const game: InternalGame = {
     id: row.id,
     status: row.status,
@@ -94,6 +115,7 @@ export async function loadGame(id: string): Promise<InternalGame> {
           })),
         }
       : null,
+    recentMoves,
     isFirstMove: row.board.every((line: unknown[]) =>
       (line as { letter: string | null }[]).every((cell) => cell.letter === null)
     ),
