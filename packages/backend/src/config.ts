@@ -30,13 +30,6 @@ export const config = {
       username: required("PLAYER2_USERNAME", process.env.PLAYER2_USERNAME),
       passwordHash: required("PLAYER2_PASSWORD_HASH", process.env.PLAYER2_PASSWORD_HASH),
     },
-    // Optional third player, who can join 3-player games (or 2-player ones).
-    player3: process.env.PLAYER3_USERNAME
-      ? {
-          username: process.env.PLAYER3_USERNAME,
-          passwordHash: required("PLAYER3_PASSWORD_HASH", process.env.PLAYER3_PASSWORD_HASH),
-        }
-      : null,
   },
   vapid: {
     publicKey: process.env.VAPID_PUBLIC_KEY ?? "",
@@ -44,10 +37,3 @@ export const config = {
     subject: process.env.VAPID_SUBJECT ?? "mailto:example@example.com",
   },
 };
-
-/** Every configured account, in seat order (player1 always plays first). */
-export const knownPlayers: KnownPlayer[] = [
-  config.players.player1,
-  config.players.player2,
-  ...(config.players.player3 ? [config.players.player3] : []),
-];

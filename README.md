@@ -1,6 +1,6 @@
 # Scrabble à deux
 
-Scrabble francophone en temps réel pour 2 ou 3 joueurs, jouable à distance. PWA (React) + backend Node/Fastify/Socket.io + PostgreSQL, pensé pour un usage strictement privé (2 ou 3 comptes connus, pas d'inscription publique).
+Scrabble francophone en temps réel pour 2 ou 3 joueurs, jouable à distance. PWA (React) + backend Node/Fastify/Socket.io + PostgreSQL, pensé pour un usage strictement privé (comptes connus, nouveaux joueurs uniquement sur invitation, pas d'inscription publique).
 
 ## Arborescence
 
@@ -31,7 +31,13 @@ node packages/backend/scripts/hash-password.mjs "motdepasse"
 
 Coller le hash obtenu dans `PLAYER1_PASSWORD_HASH` / `PLAYER2_PASSWORD_HASH` du `.env`. Les pseudos (`PLAYER1_USERNAME` / `PLAYER2_USERNAME`) sont aussi affichés comme choix rapides sur la page de connexion, via `GET /api/auth/players`.
 
-Le troisième joueur (Estelle) est optionnel : renseigner `PLAYER3_USERNAME` et `PLAYER3_PASSWORD_HASH` pour l'activer, ou laisser `PLAYER3_USERNAME` vide pour rester à 2. « Nouvelle partie » ouvre un formulaire : choisir 2 ou 3 joueurs, puis ses adversaires, avant de lancer la partie avec « Commencer la partie ». L'ordre de jeu suit l'ordre des comptes (joueur 1, 2, puis 3), et le troisième joueur d'une partie à 3 est signalé en bleu au lieu du rouge. Chaque joueur ne voit que les parties auxquelles il participe.
+### Inviter un joueur / mot de passe oublié
+
+Les autres joueurs (Estelle, par exemple) n'ont pas besoin d'être configurés dans le `.env` : depuis la liste des parties, le bouton « Inviter un joueur » (icône en haut) génère un lien à lui envoyer, sur lequel il choisit lui-même son mot de passe. Le même panneau, onglet « Mot de passe oublié », génère un lien pour choisir un nouveau mot de passe (y compris pour les 2 joueurs du `.env`, dont le hash est alors remplacé par celui enregistré en base).
+
+Les liens sont de la forme `https://…/#/invitation/<jeton>`, valables 7 jours et utilisables une seule fois ; seul un hash SHA-256 du jeton est stocké (table `invitations`), et les comptes créés vivent dans la table `accounts`. Seul un joueur connecté peut créer un lien.
+
+« Nouvelle partie » ouvre un formulaire : choisir 2 ou 3 joueurs, puis ses adversaires, avant de lancer la partie avec « Commencer la partie ». L'ordre de jeu suit l'ordre des comptes (les 2 joueurs du `.env`, puis les invités par ordre d'arrivée), et le troisième joueur d'une partie à 3 est signalé en bleu au lieu du rouge. Chaque joueur ne voit que les parties auxquelles il participe.
 
 ### Générer les clés VAPID (notifications push)
 

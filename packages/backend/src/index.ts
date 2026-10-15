@@ -1,5 +1,6 @@
 import Fastify from "fastify";
-import { config, knownPlayers } from "./config.js";
+import { config } from "./config.js";
+import { allPlayers, loadAccounts } from "./accounts.js";
 import { registerAuth, getUsernameFromRequest } from "./auth/auth.js";
 import { createNewGame, listGames, loadGame, markReminded, deleteGame } from "./game/store.js";
 import { MAX_PLAYERS } from "./game/gameEngine.js";
@@ -8,6 +9,7 @@ import { setupSocket } from "./socket/index.js";
 
 const app = Fastify({ logger: true });
 
+await loadAccounts();
 await registerAuth(app);
 
 app.get("/api/health", async () => ({ ok: true }));
@@ -26,6 +28,7 @@ app.post<{ Body: { opponents?: string[] } | undefined }>("/api/games", async (re
   // original pairing: player1 against player2.
   const opponents = req.body?.opponents ?? [config.players.player1.username, config.players.player2.username];
   const participants = new Set([username, ...opponents]);
+  const knownPlayers = allPlayers();
   const validOpponents = opponents.every((o) => knownPlayers.some((p) => p.username === o));
   if (!validOpponents || participants.size < 2 || participants.size > MAX_PLAYERS) {
     return reply.code(400).send({ error: "Choix des joueurs invalide" });

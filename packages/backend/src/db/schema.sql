@@ -47,3 +47,23 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 );
 
 CREATE INDEX IF NOT EXISTS moves_game_id_idx ON moves(game_id);
+
+-- Accounts created through an invitation link, plus password overrides for
+-- the env-configured players (set through a reset link). See accounts.ts.
+CREATE TABLE IF NOT EXISTS accounts (
+  username TEXT PRIMARY KEY,
+  password_hash TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Single-use links: 'invite' creates a new account, 'reset' sets a new
+-- password for an existing one. Only a SHA-256 of the token is stored.
+CREATE TABLE IF NOT EXISTS invitations (
+  token_hash TEXT PRIMARY KEY,
+  kind TEXT NOT NULL CHECK (kind IN ('invite', 'reset')),
+  username TEXT NOT NULL,
+  created_by TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ
+);

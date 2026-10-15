@@ -1174,6 +1174,73 @@ body {
   background: var(--color-accent);
 }
 
+.new-game__step legend,
+.new-game__label {
+  display: block;
+}
+
+.new-game__label {
+  margin-bottom: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  opacity: 0.6;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.invite__input,
+.invite__link {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.invite__link {
+  font-size: 0.8rem;
+}
+
+.invite__intro,
+.invite__note {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.invite__note {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.invitation__intro,
+.invitation__message {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.invitation__message {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+.invitation__secondary {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+  color: var(--color-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .new-game__start {
   padding: 12px;
   border-radius: 8px;
