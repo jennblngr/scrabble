@@ -37,8 +37,10 @@ app.post<{ Body: { opponents?: string[] } | undefined }>("/api/games", async (re
     return reply.code(400).send({ error: "Choix des joueurs invalide" });
   }
 
-  // Turn order follows the accounts' configured order, whoever creates the game.
-  const usernames = knownPlayers.map((p) => p.username).filter((u) => participants.has(u));
+  // The creator plays first; the others follow in the accounts' configured order.
+  const ordered = knownPlayers.map((p) => p.username).filter((u) => participants.has(u));
+  const creatorIndex = Math.max(ordered.indexOf(username), 0);
+  const usernames = [...ordered.slice(creatorIndex), ...ordered.slice(0, creatorIndex)];
   const game = await createNewGame(usernames);
 
   for (const player of game.players) {
