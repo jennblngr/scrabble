@@ -328,6 +328,11 @@ body {
 }
 
 .game {
+  /* Rack tile size: 46px, shrunk just enough for 7 tiles to fit on a single
+     row of a narrow phone, so the rack never wraps onto a second row and
+     steals height from the board. */
+  --rack-gap: 8px;
+  --rack-tile: min(46px, calc((min(100vw, 560px) - 32px - 6 * var(--rack-gap)) / 7));
   max-width: 560px;
   margin: 0 auto;
   padding: 16px 16px 28px;
@@ -766,10 +771,10 @@ body {
 
 .rack {
   display: flex;
-  gap: 8px;
+  gap: var(--rack-gap);
   justify-content: center;
-  flex-wrap: wrap;
-  min-height: 46px;
+  flex-wrap: nowrap;
+  min-height: var(--rack-tile);
   flex-shrink: 0;
 }
 
@@ -778,8 +783,8 @@ body {
 }
 
 .rack__slot--empty {
-  width: 46px;
-  height: 46px;
+  width: var(--rack-tile);
+  height: var(--rack-tile);
   border: 1px dashed var(--color-border);
   border-radius: 6px;
   box-sizing: border-box;
@@ -787,8 +792,8 @@ body {
 
 .tile {
   position: relative;
-  width: 46px;
-  height: 46px;
+  width: var(--rack-tile, 46px);
+  height: var(--rack-tile, 46px);
   background: var(--tile-bg);
   border: 1px solid var(--tile-border);
   color: var(--tile-text);
@@ -811,8 +816,8 @@ body {
 .drag-ghost {
   position: fixed;
   z-index: 1000;
-  width: 46px;
-  height: 46px;
+  width: var(--rack-tile);
+  height: var(--rack-tile);
   transform: translate(-50%, -50%);
   pointer-events: none;
   opacity: 0.9;
@@ -1083,6 +1088,63 @@ body {
   background: var(--color-disabled-bg);
   color: var(--color-disabled-text);
   cursor: default;
+}
+
+/* Short screens (phones): the board must stay the largest element, then the
+   rack, then the buttons. Everything around them is tightened so the board
+   area (which sizes the board to whatever height is left) gets the space. */
+@media (max-height: 860px) {
+  .game {
+    gap: 10px;
+    padding: 10px 16px 14px;
+  }
+
+  .game__header .icon-btn {
+    width: 36px;
+    height: 36px;
+  }
+
+  .scores__col {
+    padding: 6px 12px;
+  }
+
+  .scores__value {
+    font-size: 1.2rem;
+    margin-top: 0;
+  }
+
+  /* The bag fits on one line: count and icon side by side. */
+  .game__bag {
+    flex-direction: row;
+    gap: 4px;
+    justify-content: center;
+  }
+
+  .game__bag-count {
+    font-size: 0.95rem;
+  }
+
+  .game__bag-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .game__bag-label {
+    display: none;
+  }
+
+  .game__actions button {
+    padding: 8px 6px;
+  }
+
+  .game__validate-row .icon-btn {
+    width: 38px;
+    height: 38px;
+  }
+
+  .game__validate-row .primary {
+    padding: 9px 6px;
+  }
 }
 
 .game-loading {
