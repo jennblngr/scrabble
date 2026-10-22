@@ -22,7 +22,9 @@ function setSessionCookie(reply: FastifyReply, username: string) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     signed: true,
-    maxAge: 60 * 60 * 24 * 30, // 30 days — this is a small private app, long sessions are fine
+    // 1 year, renewed on every app launch (see /api/auth/me) — this is a small
+    // private app: a player who keeps playing should never get logged out.
+    maxAge: 60 * 60 * 24 * 365,
   });
 }
 
@@ -92,6 +94,8 @@ export async function registerAuth(app: FastifyInstance) {
   app.get("/api/auth/me", async (req, reply) => {
     const username = getUsernameFromRequest(req);
     if (!username) return reply.code(401).send({ error: "Non authentifié" });
+    // Called each time the app opens: pushes the expiry back.
+    setSessionCookie(reply, username);
     return { username };
   });
 }
