@@ -1429,8 +1429,23 @@ body {
   background: var(--color-accent-soft-bg);
 }
 
-.games-list__score {
+.games-list__main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   flex: 1;
+  min-width: 0;
+}
+
+.games-list__opponents {
+  font-size: 0.8rem;
+  opacity: 0.75;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.games-list__score {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
