@@ -539,18 +539,31 @@ function GameRow({
   return (
     <li className={`games-list__item${isMyTurn ? " games-list__item--active" : ""}`}>
       <button type="button" className="games-list__item-open" onClick={onOpen}>
-        <span className="games-list__score">
-          {scoreRow.map((p, i) => (
-            <span key={p.username}>
-              {i > 0 && " – "}
-              <span
-                className={isThirdFor(game.players, username, p.username) ? "games-list__score-third" : undefined}
-                title={p.username === username ? "Vous" : p.username}
-              >
-                {p.score}
+        <span className="games-list__main">
+          <span className="games-list__score">
+            {scoreRow.map((p, i) => (
+              <span key={p.username}>
+                {i > 0 && " – "}
+                <span
+                  className={isThirdFor(game.players, username, p.username) ? "games-list__score-third" : undefined}
+                  title={p.username === username ? "Vous" : p.username}
+                >
+                  {p.score}
+                </span>
               </span>
-            </span>
-          ))}
+            ))}
+          </span>
+          <span className="games-list__opponents">
+            contre{" "}
+            {opponents.map((p, i) => (
+              <span key={p.username}>
+                {i > 0 && " et "}
+                <span className={isThirdFor(game.players, username, p.username) ? "games-list__score-third" : undefined}>
+                  {p.username}
+                </span>
+              </span>
+            ))}
+          </span>
         </span>
         {status && <span className="games-list__status">{status}</span>}
       </button>
