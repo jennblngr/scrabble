@@ -75,7 +75,7 @@ export function App() {
   }
 
   if (gameId) {
-    return <Game username={username} gameId={gameId} onBack={backToList} />;
+    return <Game key={gameId} username={username} gameId={gameId} onBack={backToList} />;
   }
 
   return <GamesList username={username} onLoggedOut={() => setUsername(null)} onOpenGame={openGame} />;
