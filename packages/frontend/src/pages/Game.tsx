@@ -160,6 +160,22 @@ function ScoreColumn({
   );
 }
 
+// The player's own arrangement of their rack is purely local (the server
+// only knows which tiles they hold), so it is kept in localStorage to survive
+// the PWA being reloaded or evicted from memory while in the background.
+function rackOrderStorageKey(gameId: string, username: string) {
+  return `scrabble-rack-order:${gameId}:${username}`;
+}
+
+function readStoredRackOrder(gameId: string, username: string): string[] {
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(rackOrderStorageKey(gameId, username)) ?? "[]");
+    return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
 export function Game({ username, gameId, onBack }: GameProps) {
   const [state, setState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -167,7 +183,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
   const [preview, setPreview] = useState<MoveResult | null>(null);
   const [mode, setMode] = useState<"place" | "exchange" | "pass">("place");
   const [exchangeSelection, setExchangeSelection] = useState<Set<string>>(new Set());
-  const [rackOrder, setRackOrder] = useState<string[]>([]);
+  const [rackOrder, setRackOrder] = useState<string[]>(() => readStoredRackOrder(gameId, username));
   const [drag, setDrag] = useState<DragVisual | null>(null);
   const dragPendingRef = useRef<PendingDrag | null>(null);
   const [scoreAnim, setScoreAnim] = useState<ScoreAnim | null>(null);
@@ -416,6 +432,16 @@ export function Game({ username, gameId, onBack }: GameProps) {
       return [...kept, ...freshIds.slice(pairedCount)];
     });
   }, [me, exchangingTiles]);
+
+  useEffect(() => {
+    // Nothing to save until the first game:state has filled the rack in.
+    if (rackOrder.length === 0) return;
+    try {
+      localStorage.setItem(rackOrderStorageKey(gameId, username), JSON.stringify(rackOrder));
+    } catch {
+      /* storage unavailable (e.g. private mode): the order just won't persist */
+    }
+  }, [rackOrder, gameId, username]);
 
   // Each id keeps the rack slot it was drawn into: a tile placed on the
   // board (pending) becomes an empty slot rather than being removed, so the
