@@ -65,6 +65,9 @@ export function Login({ onLoggedIn }: LoginProps) {
           {loading ? "Connexion..." : "Se connecter"}
         </button>
       </form>
+      <a className="login__demo-link" href="#/demo">
+        Essayer la démo
+      </a>
     </div>
   );
 }

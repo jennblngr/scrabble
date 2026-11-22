@@ -1,7 +1,5 @@
-import type { RackTile } from "@scrabble/shared";
-import { LETTER_DATA, RACK_SIZE } from "@scrabble/shared";
-
-export { LETTER_DATA, LETTER_VALUES, RACK_SIZE, BLANK } from "@scrabble/shared";
+import type { RackTile } from "../types.js";
+import { LETTER_DATA, RACK_SIZE } from "../letters.js";
 
 export function createBag(): string[] {
   const bag: string[] = [];

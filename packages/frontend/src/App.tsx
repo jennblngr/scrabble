@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { me } from "./api/auth";
+import { createSocketConnection } from "./api/gameConnection";
 import { Login } from "./pages/Login";
 import { Game } from "./pages/Game";
 import { GamesList } from "./pages/GamesList";
@@ -15,7 +16,50 @@ function invitationTokenFromHash(): string | null {
   return match ? match[1] : null;
 }
 
+function isDemoHash(): boolean {
+  return /^#\/demo\/?$/.test(window.location.hash);
+}
+
+// Loaded on demand: the demo's word list and opponent stay out of the bundle
+// of the private app.
+const Demo = lazy(() => import("./pages/Demo"));
+
+/**
+ * The public demo is decided here, before anything else: while it is shown,
+ * the private app below is not even mounted, so no session check, API call
+ * or socket connection happens.
+ */
 export function App() {
+  const [demo, setDemo] = useState(isDemoHash);
+
+  useEffect(() => {
+    const onHashChange = () => setDemo(isDemoHash());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  if (demo) {
+    return (
+      <Suspense fallback={<div className="game-loading">Chargement de la démo...</div>}>
+        <Demo
+          onExit={() => {
+            window.location.hash = "";
+            setDemo(false);
+          }}
+        />
+      </Suspense>
+    );
+  }
+
+  return <PrivateApp />;
+}
+
+function OnlineGame({ username, gameId, onBack }: { username: string; gameId: string; onBack: () => void }) {
+  const connection = useMemo(() => createSocketConnection(gameId), [gameId]);
+  return <Game username={username} gameId={gameId} connection={connection} onBack={onBack} />;
+}
+
+function PrivateApp() {
   const [username, setUsername] = useState<string | null>(null);
   const [checked, setChecked] = useState(false);
   const [gameId, setGameId] = useState<string | null>(gameIdFromHash);
@@ -75,7 +119,7 @@ export function App() {
   }
 
   if (gameId) {
-    return <Game key={gameId} username={username} gameId={gameId} onBack={backToList} />;
+    return <OnlineGame key={gameId} username={username} gameId={gameId} onBack={backToList} />;
   }
 
   return <GamesList username={username} onLoggedOut={() => setUsername(null)} onOpenGame={openGame} />;

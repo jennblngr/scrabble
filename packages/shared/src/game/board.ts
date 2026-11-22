@@ -1,4 +1,4 @@
-import type { Board, BoardCell } from "@scrabble/shared";
+import type { Board, BoardCell } from "../types.js";
 
 const SIZE = 15;
 const CENTER = 7;

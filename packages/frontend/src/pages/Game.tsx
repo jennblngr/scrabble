@@ -1,7 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent, type ReactNode } from "react";
 import type { GameState, MoveResult, PlacedTile, Player, RackTile, RecentMove } from "@scrabble/shared";
-import { getSocket } from "../api/socket";
-import { subscribeToPush } from "../push";
+import type { GameConnection } from "../api/gameConnection";
 import { ZoomableBoard } from "../components/ZoomableBoard";
 import { Rack } from "../components/Rack";
 import { Tile } from "../components/Tile";
@@ -12,7 +11,12 @@ import { Ticker } from "../components/Ticker";
 interface GameProps {
   username: string;
   gameId: string;
+  /** Runs the game: the server (Socket.io) or, in the demo, a local engine. */
+  connection: GameConnection;
   onBack: () => void;
+  backLabel?: string;
+  /** Shown above the header (used by the demo mode). */
+  banner?: ReactNode;
 }
 
 type DragPayload =
@@ -176,7 +180,7 @@ function readStoredRackOrder(gameId: string, username: string): string[] {
   }
 }
 
-export function Game({ username, gameId, onBack }: GameProps) {
+export function Game({ username, gameId, connection, onBack, backLabel = "Retour aux parties", banner }: GameProps) {
   const [state, setState] = useState<GameState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PlacedTile[]>([]);
@@ -211,7 +215,6 @@ export function Game({ username, gameId, onBack }: GameProps) {
   const stateRef = useRef<GameState | null>(null);
 
   useEffect(() => {
-    const socket = getSocket();
     setState(null);
     setError(null);
     setPending([]);
@@ -221,7 +224,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
     hasReceivedStateRef.current = false;
     stateRef.current = null;
 
-    socket.on("game:state", (s) => {
+    const onState = (s: GameState) => {
       const prev = stateRef.current;
       const lastMoveChanged =
         !!s.lastMove &&
@@ -266,37 +269,18 @@ export function Game({ username, gameId, onBack }: GameProps) {
         setPending([]);
         setPreview(null);
       }
-    });
-    socket.on("game:error", (msg) => setError(msg));
-    socket.on("game:preview", (result) => setPreview(result));
-
-    // Socket.IO rooms don't survive a reconnection (e.g. the phone went to
-    // sleep or the network dropped): re-join on every (re)connect, otherwise
-    // this client stops receiving game:state and looks stuck after playing.
-    const join = () => socket.emit("game:join", gameId);
-    socket.on("connect", join);
-    if (socket.connected) join();
-
-    subscribeToPush().catch(() => {
-      /* notifications are a nice-to-have; ignore failures (e.g. permission denied) */
-    });
-
-    return () => {
-      socket.off("game:state");
-      socket.off("game:error");
-      socket.off("game:preview");
-      socket.off("connect", join);
-      socket.emit("game:leave", gameId);
     };
-  }, [gameId]);
+
+    return connection.open({ onState, onError: setError, onPreview: setPreview });
+  }, [connection]);
 
   useEffect(() => {
     if (pending.length === 0) {
       setPreview(null);
       return;
     }
-    getSocket().emit("game:preview", { gameId, tiles: pending });
-  }, [pending, gameId]);
+    connection.preview(pending);
+  }, [pending, connection]);
 
   const [errorFading, setErrorFading] = useState(false);
 
@@ -664,13 +648,13 @@ export function Game({ username, gameId, onBack }: GameProps) {
   function submitPlace() {
     if (!gameId || pending.length === 0) return;
     setError(null);
-    getSocket().emit("game:place", { gameId, tiles: pending });
+    connection.place(pending);
   }
 
   function submitPass() {
     if (!gameId) return;
     setError(null);
-    getSocket().emit("game:pass", { gameId });
+    connection.pass();
     setMode("place");
   }
 
@@ -678,7 +662,7 @@ export function Game({ username, gameId, onBack }: GameProps) {
     if (!gameId || exchangeSelection.size === 0 || !me) return;
     setError(null);
     const snapshot = new Map(me.rack.filter((t) => exchangeSelection.has(t.id)).map((t) => [t.id, t]));
-    getSocket().emit("game:exchange", { gameId, rackTileIds: [...exchangeSelection] });
+    connection.exchange([...exchangeSelection]);
     setExchangingTiles(snapshot);
     setBagBlink(true);
     setExchangeSelection(new Set());
@@ -691,8 +675,9 @@ export function Game({ username, gameId, onBack }: GameProps) {
 
   return (
     <div className="game">
+      {banner}
       <header className="game__header">
-        <button type="button" className="icon-btn" onClick={onBack} aria-label="Retour aux parties" title="Retour aux parties">
+        <button type="button" className="icon-btn" onClick={onBack} aria-label={backLabel} title={backLabel}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="19" y1="12" x2="5" y2="12"></line>
             <polyline points="12 19 5 12 12 5"></polyline>
