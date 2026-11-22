@@ -1,5 +1,5 @@
-import type { Board, MoveResult, PlacedTile, WordResult } from "@scrabble/shared";
-import { LETTER_VALUES } from "./tiles.js";
+import type { Board, MoveResult, PlacedTile, WordResult } from "../types.js";
+import { LETTER_VALUES } from "../letters.js";
 import type { WordCells } from "./rules.js";
 
 const BINGO_BONUS = 50;

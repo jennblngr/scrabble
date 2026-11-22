@@ -6,8 +6,8 @@ Scrabble francophone en temps réel pour 2 ou 3 joueurs, jouable à distance. PW
 
 ```
 packages/
-  shared/    types TypeScript partagés + distribution des lettres (front + back)
-  backend/   API Fastify, Socket.io, moteur de jeu, accès PostgreSQL
+  shared/    types TypeScript partagés, distribution des lettres et moteur de jeu (règles, score), sans dépendance serveur
+  backend/   API Fastify, Socket.io, dictionnaire, accès PostgreSQL
   frontend/  PWA React (Vite), plateau, chevalet, connexion temps réel
 docker-compose.yml       Postgres seul, pour le développement local
 docker-compose.prod.yml  Postgres + backend, pour le VPS (pas de reverse proxy inclus)
@@ -46,6 +46,14 @@ npx web-push generate-vapid-keys
 ```
 
 Renseigner `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` dans `.env`, et `VITE_VAPID_PUBLIC_KEY` (même valeur publique) si besoin côté build frontend.
+
+## Mode démo public
+
+`https://…/#/demo` ouvre, sans compte, une partie à 2 joueurs contre un adversaire automatique (lien « Essayer la démo » sur la page de connexion). Tout se passe dans le navigateur : la partie vit en mémoire dans l'onglet, sans appel à l'API ni au socket, sans écriture en base et sans notification ; recharger la page relance une partie.
+
+- Le moteur (`packages/shared/src/game`) est le même que celui du serveur ; seul le dictionnaire diffère. La démo valide les mots, et fait jouer l'adversaire, avec une liste réduite embarquée (`packages/frontend/src/demo/words.ts`), ce que le bandeau « Mode démo » signale.
+- La page de jeu reçoit une « connexion de partie » (`api/gameConnection.ts`) : Socket.io pour les vraies parties, moteur local (`demo/localConnection.ts`) pour la démo.
+- La route est décidée dans `App.tsx` avant tout le reste : tant que la démo est affichée, l'application privée n'est pas montée. `pages/Demo.tsx` et `demo/` ne doivent importer ni `api/auth`, `api/games`, `api/socket`, ni `push`.
 
 ## Dictionnaire
 
