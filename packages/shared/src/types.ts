@@ -95,6 +95,14 @@ export interface GameSummary {
   lastRemindedAt: string | null;
 }
 
+/** A player's scoring over every word they placed (passes and exchanges excluded). */
+export interface MoveStats {
+  /** Mean score of a placed move, null before the first one. */
+  averageMoveScore: number | null;
+  /** Highest score of a single move, null before the first one. */
+  bestMoveScore: number | null;
+}
+
 export interface WordResult {
   word: string;
   cells: { row: number; col: number }[];

@@ -3,7 +3,7 @@ import { config } from "./config.js";
 import { allPlayers, loadAccounts } from "./accounts.js";
 import { applySchema } from "./db/schema.js";
 import { registerAuth, getUsernameFromRequest } from "./auth/auth.js";
-import { createNewGame, listGames, loadGame, markReminded, deleteGame } from "./game/store.js";
+import { createNewGame, listGames, loadGame, markReminded, deleteGame, getMoveStats } from "./game/store.js";
 import { MAX_PLAYERS } from "./game/gameEngine.js";
 import { saveSubscription, notifyUser } from "./push.js";
 import { setupSocket } from "./socket/index.js";
@@ -21,6 +21,12 @@ app.get("/api/games", async (req, reply) => {
   const username = getUsernameFromRequest(req);
   if (!username) return reply.code(401).send({ error: "Non authentifié" });
   return { games: await listGames(username) };
+});
+
+app.get("/api/stats", async (req, reply) => {
+  const username = getUsernameFromRequest(req);
+  if (!username) return reply.code(401).send({ error: "Non authentifié" });
+  return getMoveStats(username);
 });
 
 app.post<{ Body: { opponents?: string[] } | undefined }>("/api/games", async (req, reply) => {

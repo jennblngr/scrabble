@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { listGames } from "../api/games";
+import type { MoveStats } from "@scrabble/shared";
+import { listGames, moveStats } from "../api/games";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { computeStats, type PlayerStats } from "../stats";
 
@@ -18,12 +19,12 @@ function formatRatio(stats: PlayerStats): string {
 }
 
 export function Stats({ username, onBack }: StatsProps) {
-  const [stats, setStats] = useState<PlayerStats | null>(null);
+  const [stats, setStats] = useState<(PlayerStats & MoveStats) | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    listGames()
-      .then(({ games }) => setStats(computeStats(games, username)))
+    Promise.all([listGames(), moveStats()])
+      .then(([{ games }, moves]) => setStats({ ...computeStats(games, username), ...moves }))
       .catch((err) => setError((err as Error).message));
   }, [username]);
 
@@ -55,8 +56,8 @@ export function Stats({ username, onBack }: StatsProps) {
       {stats && (
         <dl className="stats__grid">
           <StatCard label="Parties jouées" value={String(stats.played)} wide />
-          <StatCard label="Score moyen par partie" value={stats.averageScore === null ? "–" : decimal.format(stats.averageScore)} wide />
-          <StatCard label="Meilleur score" value={stats.bestScore === null ? "–" : String(stats.bestScore)} wide />
+          <StatCard label="Score moyen par coup" value={stats.averageMoveScore === null ? "–" : decimal.format(stats.averageMoveScore)} wide />
+          <StatCard label="Meilleur coup" value={stats.bestMoveScore === null ? "–" : String(stats.bestMoveScore)} wide />
           <StatCard label="Victoires" value={String(stats.wins)} />
           <StatCard label="Défaites" value={String(stats.losses)} />
           <StatCard
