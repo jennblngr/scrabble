@@ -1,8 +1,12 @@
-import type { GameSummary } from "@scrabble/shared";
+import type { GameSummary, MoveStats } from "@scrabble/shared";
 import { request } from "./request";
 
 export function listGames(): Promise<{ games: GameSummary[] }> {
   return request<{ games: GameSummary[] }>("/api/games");
+}
+
+export function moveStats(): Promise<MoveStats> {
+  return request<MoveStats>("/api/stats");
 }
 
 /** Without `opponents`, the server falls back to its default pairing. */

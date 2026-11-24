@@ -1171,6 +1171,18 @@ body {
   gap: 8px;
 }
 
+/* Four header buttons no longer fit beside the title on the narrowest phones. */
+@media (max-width: 370px) {
+  .games-list__header-actions {
+    gap: 4px;
+  }
+
+  .games-list__header-actions .icon-btn {
+    width: 34px;
+    height: 34px;
+  }
+}
+
 .games-list h2 {
   font-size: 1rem;
   margin: 20px 0 8px;
@@ -1568,4 +1580,51 @@ body {
 
 .login__demo-link:hover {
   color: var(--color-accent);
+}
+
+.stats__title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.stats__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 12px 0 0;
+}
+
+.stats__card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
+}
+
+.stats__card--wide {
+  grid-column: 1 / -1;
+}
+
+.stats__label {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+
+.stats__value {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.stats__note {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
 }

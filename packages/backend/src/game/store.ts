@@ -1,5 +1,5 @@
 import { pool } from "../db/pool.js";
-import type { GameSummary } from "@scrabble/shared";
+import type { GameSummary, MoveStats } from "@scrabble/shared";
 import { createGame, recentMovesLimit, type InternalGame } from "./gameEngine.js";
 
 const cache = new Map<string, InternalGame>();
@@ -46,6 +46,19 @@ export async function listGames(username: string): Promise<GameSummary[]> {
   }
 
   return [...byId.values()];
+}
+
+/**
+ * Only placed words count: a pass or an exchange is not a scoring move, and
+ * would otherwise drag the average down with zeros.
+ */
+export async function getMoveStats(username: string): Promise<MoveStats> {
+  const { rows } = await pool.query(
+    `SELECT AVG(score)::float8 AS average, MAX(score) AS best
+     FROM moves WHERE username = $1 AND kind = 'place'`,
+    [username]
+  );
+  return { averageMoveScore: rows[0].average, bestMoveScore: rows[0].best };
 }
 
 export async function loadGame(id: string): Promise<InternalGame> {
