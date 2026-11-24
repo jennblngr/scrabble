@@ -5,6 +5,7 @@ import { logout, players as fetchPlayers } from "../api/auth";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { Toast, type ToastState } from "../components/Toast";
 import { isThirdFor, playersFrom } from "../players";
+import { gameOutcome } from "../stats";
 import { createInvitation, invitationUrl, type InvitationKind } from "../api/invitations";
 
 const REMINDER_DELAY_MS = 24 * 60 * 60 * 1000;
@@ -14,9 +15,10 @@ interface GamesListProps {
   username: string;
   onLoggedOut: () => void;
   onOpenGame: (gameId: string) => void;
+  onOpenStats: () => void;
 }
 
-export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps) {
+export function GamesList({ username, onLoggedOut, onOpenGame, onOpenStats }: GamesListProps) {
   const [games, setGames] = useState<GameSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
@@ -92,6 +94,19 @@ export function GamesList({ username, onLoggedOut, onOpenGame }: GamesListProps)
       <header className="games-list__header">
         <h1>Scrabble</h1>
         <div className="games-list__header-actions">
+          <button
+            type="button"
+            className="icon-btn"
+            onClick={onOpenStats}
+            aria-label="Statistiques"
+            title="Statistiques"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="6" y1="20" x2="6" y2="14"></line>
+              <line x1="12" y1="20" x2="12" y2="4"></line>
+              <line x1="18" y1="20" x2="18" y2="10"></line>
+            </svg>
+          </button>
           <button
             type="button"
             className="icon-btn"
@@ -497,15 +512,9 @@ function GameRow({
   // Me first, then the others in turn order starting after me.
   const scoreRow = me ? [me, ...opponents] : opponents;
 
-  const myScore = me?.score ?? 0;
-  const bestOpponentScore = Math.max(...opponents.map((p) => p.score));
   const status =
     game.status === "finished"
-      ? myScore === bestOpponentScore
-        ? "Égalité"
-        : myScore > bestOpponentScore
-          ? "Gagnée"
-          : "Perdue"
+      ? { won: "Gagnée", lost: "Perdue", tied: "Égalité" }[gameOutcome(game, username)]
       : null;
 
   const lastActivity =

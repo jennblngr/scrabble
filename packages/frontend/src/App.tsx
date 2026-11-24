@@ -5,6 +5,7 @@ import { Login } from "./pages/Login";
 import { Game } from "./pages/Game";
 import { GamesList } from "./pages/GamesList";
 import { Invitation } from "./pages/Invitation";
+import { Stats } from "./pages/Stats";
 
 function gameIdFromHash(): string | null {
   const match = window.location.hash.match(/^#\/game\/(.+)$/);
@@ -14,6 +15,10 @@ function gameIdFromHash(): string | null {
 function invitationTokenFromHash(): string | null {
   const match = window.location.hash.match(/^#\/invitation\/(.+)$/);
   return match ? match[1] : null;
+}
+
+function isStatsHash(): boolean {
+  return /^#\/stats\/?$/.test(window.location.hash);
 }
 
 function isDemoHash(): boolean {
@@ -64,6 +69,7 @@ function PrivateApp() {
   const [checked, setChecked] = useState(false);
   const [gameId, setGameId] = useState<string | null>(gameIdFromHash);
   const [invitationToken, setInvitationToken] = useState<string | null>(invitationTokenFromHash);
+  const [stats, setStats] = useState(isStatsHash);
 
   useEffect(() => {
     me()
@@ -76,6 +82,7 @@ function PrivateApp() {
     const onHashChange = () => {
       setGameId(gameIdFromHash());
       setInvitationToken(invitationTokenFromHash());
+      setStats(isStatsHash());
     };
     window.addEventListener("hashchange", onHashChange);
     return () => window.removeEventListener("hashchange", onHashChange);
@@ -89,6 +96,12 @@ function PrivateApp() {
   function backToList() {
     window.location.hash = "";
     setGameId(null);
+    setStats(false);
+  }
+
+  function openStats() {
+    window.location.hash = "#/stats";
+    setStats(true);
   }
 
   function leaveInvitation() {
@@ -122,5 +135,16 @@ function PrivateApp() {
     return <OnlineGame key={gameId} username={username} gameId={gameId} onBack={backToList} />;
   }
 
-  return <GamesList username={username} onLoggedOut={() => setUsername(null)} onOpenGame={openGame} />;
+  if (stats) {
+    return <Stats username={username} onBack={backToList} />;
+  }
+
+  return (
+    <GamesList
+      username={username}
+      onLoggedOut={() => setUsername(null)}
+      onOpenGame={openGame}
+      onOpenStats={openStats}
+    />
+  );
 }
