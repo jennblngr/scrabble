@@ -53,26 +53,19 @@ export function Stats({ username, onBack }: StatsProps) {
       {!error && stats === null && <p className="games-list__empty">Chargement...</p>}
 
       {stats && (
-        <>
-          <p className="stats__intro">
-            {stats.played === 0
-              ? `${username}, tes statistiques apparaîtront ici dès ta première partie terminée.`
-              : `${username}, sur ${stats.played} partie${stats.played > 1 ? "s" : ""} terminée${stats.played > 1 ? "s" : ""}.`}
-          </p>
-
-          <dl className="stats__grid">
-            <StatCard label="Score moyen par partie" value={stats.averageScore === null ? "–" : decimal.format(stats.averageScore)} wide />
-            <StatCard label="Meilleur score" value={stats.bestScore === null ? "–" : String(stats.bestScore)} wide />
-            <StatCard label="Victoires" value={String(stats.wins)} />
-            <StatCard label="Défaites" value={String(stats.losses)} />
-            <StatCard
-              label="Ratio victoires / défaites"
-              value={formatRatio(stats)}
-              note={stats.ties > 0 ? `${stats.ties} égalité${stats.ties > 1 ? "s" : ""} non comptée${stats.ties > 1 ? "s" : ""}` : undefined}
-              wide
-            />
-          </dl>
-        </>
+        <dl className="stats__grid">
+          <StatCard label="Parties jouées" value={String(stats.played)} wide />
+          <StatCard label="Score moyen par partie" value={stats.averageScore === null ? "–" : decimal.format(stats.averageScore)} wide />
+          <StatCard label="Meilleur score" value={stats.bestScore === null ? "–" : String(stats.bestScore)} wide />
+          <StatCard label="Victoires" value={String(stats.wins)} />
+          <StatCard label="Défaites" value={String(stats.losses)} />
+          <StatCard
+            label="Ratio victoires / défaites"
+            value={formatRatio(stats)}
+            note={stats.ties > 0 ? `${stats.ties} égalité${stats.ties > 1 ? "s" : ""} non comptée${stats.ties > 1 ? "s" : ""}` : undefined}
+            wide
+          />
+        </dl>
       )}
     </div>
   );
