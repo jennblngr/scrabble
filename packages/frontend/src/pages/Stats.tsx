@@ -61,8 +61,8 @@ export function Stats({ username, onBack }: StatsProps) {
           </p>
 
           <dl className="stats__grid">
-            <StatCard label="Score moyen par partie" value={stats.averageScore === null ? "–" : decimal.format(stats.averageScore)} />
-            <StatCard label="Meilleur score" value={stats.bestScore === null ? "–" : String(stats.bestScore)} />
+            <StatCard label="Score moyen par partie" value={stats.averageScore === null ? "–" : decimal.format(stats.averageScore)} wide />
+            <StatCard label="Meilleur score" value={stats.bestScore === null ? "–" : String(stats.bestScore)} wide />
             <StatCard label="Victoires" value={String(stats.wins)} />
             <StatCard label="Défaites" value={String(stats.losses)} />
             <StatCard
