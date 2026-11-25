@@ -520,8 +520,10 @@ export function Game({ username, gameId, connection, onBack, backLabel = "Retour
         setPending((prev) => prev.filter((t) => !(t.row === payload.fromRow && t.col === payload.fromCol)));
         return;
       }
-      // Dropped on the rack but not on a specific tile: send it to the end.
-      setRackOrder((prev) => [...prev.filter((id) => id !== payload.rackTileId), payload.rackTileId]);
+      // Dropped on the rack but not on a specific slot (e.g. in the gap
+      // between two slots): snap to whichever slot is nearest.
+      const nearest = nearestRackSlotId(targetEl, clientX);
+      if (nearest) reorderRack(payload.rackTileId, nearest);
       return;
     }
 
@@ -533,6 +535,24 @@ export function Game({ username, gameId, connection, onBack, backLabel = "Retour
       const targetTileId = target.slice("rack-tile:".length);
       reorderRack(payload.rackTileId, targetTileId);
     }
+  }
+
+  // Id of the rack slot whose horizontal center is closest to clientX. Used
+  // when the pointer is over the rack but between slots, so the tile goes to
+  // the left or right slot depending on which side of the gap's midpoint it
+  // is on.
+  function nearestRackSlotId(rackEl: HTMLElement, clientX: number): string | undefined {
+    let best: string | undefined;
+    let bestDist = Infinity;
+    rackEl.querySelectorAll<HTMLElement>('[data-drop-target^="rack-tile:"]').forEach((slot) => {
+      const rect = slot.getBoundingClientRect();
+      const dist = Math.abs(clientX - (rect.left + rect.width / 2));
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = slot.dataset.dropTarget!.slice("rack-tile:".length);
+      }
+    });
+    return best;
   }
 
   // Moves rackTileId next to targetTileId. If the target slot is empty (its
@@ -565,11 +585,15 @@ export function Game({ username, gameId, connection, onBack, backLabel = "Retour
   // so tiles shift/swap out of the way on hover instead of only on drop.
   function liveReorderRack(clientX: number, clientY: number, payload: DragPayload) {
     if (payload.source !== "rack") return;
-    const target = document
-      .elementFromPoint(clientX, clientY)
-      ?.closest<HTMLElement>("[data-drop-target]")
-      ?.dataset.dropTarget;
-    if (!target?.startsWith("rack-tile:")) return;
+    const targetEl = document.elementFromPoint(clientX, clientY)?.closest<HTMLElement>("[data-drop-target]");
+    const target = targetEl?.dataset.dropTarget;
+    if (!targetEl || !target) return;
+    if (target === "rack") {
+      const nearest = nearestRackSlotId(targetEl, clientX);
+      if (nearest) reorderRack(payload.rackTileId, nearest);
+      return;
+    }
+    if (!target.startsWith("rack-tile:")) return;
     reorderRack(payload.rackTileId, target.slice("rack-tile:".length));
   }
 
