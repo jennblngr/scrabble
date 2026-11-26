@@ -515,26 +515,57 @@ export function Game({ username, gameId, connection, onBack, backLabel = "Retour
       return;
     }
 
-    if (target === "rack") {
+    if (target === "rack" || target.startsWith("rack-tile:")) {
+      // Over the rack but not on a specific slot (e.g. in the gap between
+      // two slots): snap to whichever slot is nearest.
+      const slotId =
+        target === "rack" ? nearestRackSlotId(targetEl, clientX) : target.slice("rack-tile:".length);
       if (payload.source === "board") {
-        setPending((prev) => prev.filter((t) => !(t.row === payload.fromRow && t.col === payload.fromCol)));
+        returnTileToRack(payload.fromRow, payload.fromCol, targetEl, slotId, clientX);
         return;
       }
-      // Dropped on the rack but not on a specific slot (e.g. in the gap
-      // between two slots): snap to whichever slot is nearest.
-      const nearest = nearestRackSlotId(targetEl, clientX);
-      if (nearest) reorderRack(payload.rackTileId, nearest);
-      return;
+      if (slotId) reorderRack(payload.rackTileId, slotId);
     }
+  }
 
-    if (target.startsWith("rack-tile:")) {
-      if (payload.source === "board") {
-        setPending((prev) => prev.filter((t) => !(t.row === payload.fromRow && t.col === payload.fromCol)));
-        return;
+  // Takes a pending tile back off the board and puts it where it was dropped
+  // on the rack, rather than back in the slot it originally came from. On an
+  // empty slot it takes that slot; on (or next to) a letter it is inserted
+  // before or after it, depending on which side of that letter's center the
+  // pointer is.
+  function returnTileToRack(
+    fromRow: number,
+    fromCol: number,
+    targetEl: HTMLElement,
+    slotId: string | undefined,
+    clientX: number
+  ) {
+    const moved = pending.find((t) => t.row === fromRow && t.col === fromCol);
+    if (!moved) return;
+    setPending((prev) => prev.filter((t) => !(t.row === fromRow && t.col === fromCol)));
+    const movedId = moved.rackTileId;
+    if (!slotId || slotId === movedId) return;
+
+    const slotIsEmpty = pending.some((t) => t.rackTileId === slotId);
+    const slotEl = (targetEl.closest<HTMLElement>(".rack") ?? targetEl).querySelector<HTMLElement>(
+      `[data-drop-target="rack-tile:${CSS.escape(slotId)}"]`
+    );
+    const rect = slotEl?.getBoundingClientRect();
+    const after = !!rect && clientX > rect.left + rect.width / 2;
+
+    setRackOrder((prev) => {
+      const from = prev.indexOf(movedId);
+      const to = prev.indexOf(slotId);
+      if (from === -1 || to === -1) return prev;
+      const next = [...prev];
+      if (slotIsEmpty) {
+        [next[from], next[to]] = [next[to], next[from]];
+        return next;
       }
-      const targetTileId = target.slice("rack-tile:".length);
-      reorderRack(payload.rackTileId, targetTileId);
-    }
+      next.splice(from, 1);
+      next.splice(next.indexOf(slotId) + (after ? 1 : 0), 0, movedId);
+      return next;
+    });
   }
 
   // Id of the rack slot whose horizontal center is closest to clientX. Used
